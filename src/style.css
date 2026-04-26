@@ -312,6 +312,25 @@ label.field>span {
     @apply bg-white/75 text-ink;
     border: 1px solid rgba(255, 255, 255, 0.6);
   }
+
+  /* ─── AuthWall 專屬優化 ─── */
+  .field-group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .field-label {
+    @apply pl-1 text-[11px] uppercase tracking-[0.2em] text-ink/40 font-medium;
+  }
+
+  .auth-input {
+    @apply w-full rounded-[22px] px-11 py-3.5 text-sm text-ink outline-none transition-all duration-500 placeholder:text-ink/25;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .auth-input:focus {
+    @apply border-ink/20 bg-white/90 shadow-xl shadow-ink/5;
+  }
 }
 
 /* ─── 視覺細節預覽 ─── */

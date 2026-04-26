@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
-        name: 'Couple Ledger',
-        short_name: 'Couple',
-        description: 'A private two-person ritual for tasks, coins, and rewards.',
+        name: 'ZC',
+        short_name: 'ZC',
+        description: '鼻鼻們的窩',
         theme_color: '#e9dfd2',
         background_color: '#f5efe6',
         display: 'standalone',

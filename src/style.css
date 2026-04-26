@@ -1,0 +1,362 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #241f1a;
+  background-color: #f5efe6;
+  font-family: "Noto Serif TC", serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html,
+body {
+  background-color: #f5efe6;
+  /* 徹底禁用過度捲動的回彈黑影 */
+  overscroll-behavior: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100dvh;
+  /* 移除 background-attachment: fixed，解決手機端斷層與黑影問題 */
+  background-color: #f5efe6;
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 40%),
+    radial-gradient(circle at bottom right, rgba(178, 138, 92, 0.05), transparent 40%),
+    linear-gradient(180deg, #fffaf4 0%, #f5efe6 100%);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ─── 禁止使用者選取 ─── */
+button,
+nav,
+.nav-button,
+.section-tab,
+.segmented-button,
+.status-pill,
+.panel-eyebrow,
+.glass-panel>.flex>p,
+label.field>span {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+::selection {
+  background: rgba(178, 138, 92, 0.24);
+}
+
+.motion-still *,
+.motion-still *::before,
+.motion-still *::after {
+  transition-duration: 0ms !important;
+  animation-duration: 0ms !important;
+}
+
+/* ─── 動態節奏：過渡動畫 ─── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.glass-muted .glass-panel {
+  background: rgba(255, 255, 255, 0.32);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.glass-muted .soft-card {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.density-compact .glass-panel,
+.density-compact .soft-card {
+  border-radius: 22px;
+}
+
+* {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@layer components {
+  .glass-panel {
+    box-shadow: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    background-color: rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(32px);
+    backdrop-filter: blur(32px);
+    /* 解決邊緣黑影渲染問題 */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  .soft-card {
+    box-shadow: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.32);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    /* 解決邊緣黑影渲染問題 */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  .panel-eyebrow {
+    @apply text-xs uppercase tracking-[0.2em] text-ink/45;
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-[20px] bg-ink px-4 py-2.5 text-sm text-mist transition-all duration-300;
+    border: 1px solid rgba(178, 138, 92, 0.2);
+    box-shadow: none !important;
+  }
+
+  @media (hover: hover) {
+    .primary-button:hover {
+      background: rgba(36, 31, 26, 0.85);
+      transform: translateY(-1px);
+    }
+  }
+
+  .primary-button:active {
+    background: rgba(36, 31, 26, 0.85);
+    transform: scale(0.97);
+  }
+
+  .ghost-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-[20px] px-4 py-2.5 text-sm text-ink/75 transition-all duration-300;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: none !important;
+  }
+
+  @media (hover: hover) {
+    .ghost-button:hover {
+      background: rgba(255, 255, 255, 0.8);
+      transform: translateY(-1px);
+    }
+  }
+
+  .ghost-button:active {
+    background: rgba(255, 255, 255, 0.8);
+    transform: scale(0.97);
+  }
+
+  .field {
+    @apply flex flex-col gap-2 text-sm text-ink/65;
+  }
+
+  .field span {
+    @apply text-xs uppercase tracking-[0.18em] text-ink/45;
+  }
+
+  .field input,
+  .field textarea {
+    @apply w-full rounded-[22px] px-4 py-3 text-sm text-ink outline-none transition-all duration-300 placeholder:text-ink/35;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.6);
+    box-shadow: none !important;
+  }
+
+  .field input:focus,
+  .field textarea:focus {
+    border-color: rgba(178, 138, 92, 0.35);
+    background-color: rgba(255, 255, 255, 0.85);
+  }
+
+  .field select {
+    @apply w-full rounded-[22px] px-4 py-3 text-sm text-ink outline-none transition;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.6);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b28a5c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    padding-right: 2.5rem;
+    cursor: pointer;
+    box-shadow: none !important;
+  }
+
+  .field input[type="file"] {
+    cursor: pointer;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+
+  .field input[type="file"]::file-selector-button {
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: rgba(36, 31, 26, 0.72);
+    background-color: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(178, 138, 92, 0.25);
+    border-radius: 16px;
+    padding: 0.45rem 1rem;
+    margin-right: 0.75rem;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  @media (hover: hover) {
+    .field input[type="file"]::file-selector-button:hover {
+      background-color: rgba(178, 138, 92, 0.1);
+      border-color: rgba(178, 138, 92, 0.45);
+    }
+  }
+
+  .field input[type="file"]::file-selector-button:active {
+    background-color: rgba(178, 138, 92, 0.15);
+  }
+
+  .field input[type="file"] {
+    font-size: 0.8125rem;
+    color: rgba(36, 31, 26, 0.5);
+    padding: 0.5rem 0;
+  }
+
+  .segmented-button {
+    @apply inline-flex items-center gap-2 rounded-[20px] px-4 py-2.5 text-sm text-ink/70 transition-all duration-300;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.5);
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  @media (hover: hover) {
+    .segmented-button:hover:not(.segmented-active) {
+      background-color: rgba(255, 255, 255, 0.75);
+    }
+  }
+
+  .segmented-active {
+    @apply border-transparent bg-ink text-mist shadow-lg shadow-ink/5;
+  }
+
+  .section-tabs {
+    @apply flex flex-wrap gap-3;
+    max-width: 100%;
+  }
+
+  .section-tab {
+    @apply inline-flex items-center gap-2 rounded-[18px] px-4 py-2.5 text-sm transition-all duration-300;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.5);
+    color: rgba(36, 31, 26, 0.65);
+    box-shadow: none !important;
+    white-space: nowrap;
+  }
+
+  .section-tab-active {
+    color: #fff9f2;
+    background-color: rgba(36, 31, 26, 0.95);
+    border-color: transparent;
+  }
+
+  .nav-button {
+    @apply flex min-w-[56px] flex-col items-center gap-1 rounded-[18px] px-3 py-2 text-[11px] text-ink/45 transition-all duration-300;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .nav-button-active {
+    @apply bg-white/75 text-ink;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* ─── 視覺細節預覽 ─── */
+
+.density-compact .glass-panel,
+.density-compact .soft-card,
+.density-compact .segmented-button,
+.density-compact .section-tab,
+.density-compact .primary-button,
+.density-compact .ghost-button {
+  border-radius: 14px;
+}
+
+.density-compact .field input,
+.density-compact .field textarea,
+.density-compact .field select {
+  border-radius: 16px;
+}
+
+.glass-luminous .glass-panel {
+  background-color: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(36px) saturate(1.6);
+  backdrop-filter: blur(36px) saturate(1.6);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+.glass-muted .glass-panel {
+  background-color: rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: blur(16px) saturate(0.8);
+  backdrop-filter: blur(16px) saturate(0.8);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 640px) {
+  .section-tabs {
+    gap: 0.75rem 0.5rem;
+  }
+
+  .section-tab {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.8125rem;
+  }
+
+  .glass-panel,
+  .soft-card {
+    overflow: visible;
+  }
+}

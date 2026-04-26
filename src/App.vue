@@ -51,7 +51,10 @@ const {
   myRedemptions,
   balances,
   recentLedger,
-  completeSetup,
+  fetchData,
+  createSpace,
+  joinSpace,
+  getInviteCode,
   switchPerspective,
   updateProfile,
   updateAppearance,
@@ -93,11 +96,8 @@ const redemptionNote = ref<Record<string, string>>({})
 const banner = ref('目前先以可用原型與正式骨架並行。你可以直接操作，也能隨時接上 Supabase。')
 const isBusy = ref(false)
 
-const setupForm = reactive<SetupForm>({
-  selfName: '',
-  partnerName: '',
-  selfTitle: '今天的你',
-  partnerTitle: '另一半'
+const setupForm = reactive({
+  inviteCode: ''
 })
 
 const taskForm = reactive({
@@ -281,14 +281,30 @@ const getRedemptionLabel = (status: string) =>
     cancelled: '已取消'
   })[status] ?? status
 
-const setupApp = () => {
-  if (!setupForm.selfName.trim() || !setupForm.partnerName.trim()) {
-    banner.value = '先把你們的名字填好，我再替你把空間整理起來。'
+const handleCreateSpace = async () => {
+  isBusy.value = true
+  const result = await createSpace()
+  isBusy.value = false
+  if (result.error) {
+    banner.value = `建立失敗：${result.error}`
     return
   }
+  banner.value = `雙人空間已經建立！你的邀請碼是 ${result.code}，請將它交給對方。`
+}
 
-  completeSetup(setupForm)
-  banner.value = '雙人空間已經建立。你現在可以直接開始發任務和寫商城。'
+const handleJoinSpace = async () => {
+  if (!setupForm.inviteCode.trim()) {
+    banner.value = '請輸入對方的邀請碼。'
+    return
+  }
+  isBusy.value = true
+  const result = await joinSpace(setupForm.inviteCode)
+  isBusy.value = false
+  if (result.error) {
+    banner.value = `加入失敗：${result.error}`
+    return
+  }
+  banner.value = '已成功加入雙人空間！'
 }
 
 const switchMainView = (view: ViewKey) => {
@@ -440,11 +456,79 @@ const setDensity = (value: DensityMode) => updateAppearance({ density: value })
 const setMotion = (value: MotionMode) => updateAppearance({ motion: value })
 const setGlass = (value: GlassMode) => updateAppearance({ glass: value })
 
+// --- 登入與資料同步邏輯 ---
+const showAuthWall = computed(() => isSupabaseEnabled && !authLoading.value && !isAuthenticated.value)
+
+watch(
+  user,
+  async (currentUser) => {
+    if (currentUser) {
+      await fetchData()
+      const meta = currentUser.user_metadata || {}
+      updateProfile('self', {
+        name: meta.nickname || profileMap.value.self.name,
+        avatarUrl: meta.avatar_url || null
+      })
+    }
+  },
+  { immediate: true }
+)
+
 const personById = (userId: UserId): Profile => profileMap.value[userId]
 </script>
 
 <template>
-  <div class="min-h-screen bg-paper bg-mesh text-ink" :class="appShellClasses">
+  <!-- 登入牆 -->
+  <div v-if="showAuthWall" class="flex min-h-screen items-center justify-center bg-paper bg-mesh px-4">
+    <div class="glass-panel w-full max-w-md space-y-8 rounded-[28px] p-8 sm:p-10">
+      <div class="text-center">
+        <h1 class="font-serif text-3xl font-medium text-ink">ZC</h1>
+        <p class="mt-2 text-sm uppercase tracking-[0.2em] text-ink/45">Private Ritual</p>
+      </div>
+
+      <div class="flex rounded-[20px] bg-white/40 p-1">
+        <button
+          class="flex-1 rounded-[16px] py-2 text-sm transition"
+          :class="accountMode === 'signin' ? 'bg-ink text-mist' : 'text-ink/60 hover:bg-white/60'"
+          @click="accountMode = 'signin'"
+        >
+          登入
+        </button>
+        <button
+          class="flex-1 rounded-[16px] py-2 text-sm transition"
+          :class="accountMode === 'signup' ? 'bg-ink text-mist' : 'text-ink/60 hover:bg-white/60'"
+          @click="accountMode = 'signup'"
+        >
+          註冊
+        </button>
+      </div>
+
+      <form @submit.prevent="handleAccountSubmit" class="space-y-5">
+        <label v-if="accountMode === 'signup'" class="field">
+          <span>您的暱稱</span>
+          <input v-model="accountForm.nickname" type="text" placeholder="怎麼稱呼您？" required />
+        </label>
+        <label class="field">
+          <span>電子信箱</span>
+          <input v-model="accountForm.email" type="email" placeholder="hello@example.com" required />
+        </label>
+        <label class="field">
+          <span>密碼</span>
+          <input v-model="accountForm.password" type="password" placeholder="至少 6 個字元" required minlength="6" />
+        </label>
+
+        <p v-if="authErrorMessage" class="text-sm text-red-500/80">{{ authErrorMessage }}</p>
+
+        <button type="submit" class="primary-button w-full justify-center !py-3.5 !text-base" :disabled="authLoading">
+          <span v-if="authLoading">處理中...</span>
+          <span v-else>{{ accountMode === 'signin' ? '登入帳號' : '建立帳號' }}</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 應用主體 -->
+  <div v-else class="min-h-screen bg-paper bg-mesh text-ink" :class="appShellClasses">
     <div class="mx-auto flex min-h-screen max-w-7xl flex-col overflow-x-hidden px-4 pb-28 pt-4 sm:px-6 lg:px-8">
       <header class="glass-panel mb-4 flex flex-col gap-4 rounded-[28px] px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
         <div class="space-y-2">
@@ -482,34 +566,28 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
         class="glass-panel mx-auto mt-6 w-full max-w-3xl rounded-[32px] px-5 py-6 sm:px-8 sm:py-8"
       >
         <div class="mb-6 space-y-2 text-center">
-          <p class="text-xs uppercase tracking-[0.24em] text-ink/45">Setup</p>
-          <h2 class="font-serif text-3xl">先替你們留好位置</h2>
+          <p class="text-xs uppercase tracking-[0.24em] text-ink/45">Space Setup</p>
+          <h2 class="font-serif text-3xl">歡迎來到專屬空間</h2>
           <p class="mx-auto max-w-xl text-sm leading-6 text-ink/65">
-            這一版先用本機資料建立你們的專屬空間，同時保留正式帳號與 Supabase 的接點。
+            你目前還沒有加入任何雙人空間。你可以建立一個新的空間，或使用伴侶給你的邀請碼來加入。
           </p>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
-          <label class="field">
-            <span>你的名字</span>
-            <input v-model="setupForm.selfName" type="text" placeholder="例如：阿佑" />
-          </label>
-          <label class="field">
-            <span>對方的名字</span>
-            <input v-model="setupForm.partnerName" type="text" placeholder="例如：小晴" />
-          </label>
-          <label class="field">
-            <span>你的稱呼</span>
-            <input v-model="setupForm.selfTitle" type="text" placeholder="今天的你" />
-          </label>
-          <label class="field">
-            <span>對方的稱呼</span>
-            <input v-model="setupForm.partnerTitle" type="text" placeholder="另一半" />
-          </label>
-        </div>
-
-        <div class="mt-6 flex justify-end">
-          <button class="primary-button" @click="setupApp">建立雙人空間</button>
+        <div class="grid gap-6 sm:grid-cols-2">
+          <div class="soft-card flex flex-col gap-4 rounded-[24px] px-5 py-6">
+            <h3 class="font-serif text-xl">建立新空間</h3>
+            <p class="text-sm text-ink/65">開啟一個全新的記帳空間，並產生邀請碼給對方。</p>
+            <button class="primary-button mt-auto justify-center" @click="handleCreateSpace" :disabled="isBusy">建立空間</button>
+          </div>
+          
+          <div class="soft-card flex flex-col gap-4 rounded-[24px] px-5 py-6">
+            <h3 class="font-serif text-xl">加入空間</h3>
+            <p class="text-sm text-ink/65">使用伴侶提供的邀請碼，加入已經存在的空間。</p>
+            <label class="field mt-auto">
+              <input v-model="setupForm.inviteCode" type="text" placeholder="例如：PAIR-XXXXX" />
+            </label>
+            <button class="primary-button justify-center" @click="handleJoinSpace" :disabled="isBusy">加入空間</button>
+          </div>
         </div>
       </section>
 
@@ -1018,67 +1096,24 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                   <div class="mb-4 flex items-start justify-between gap-4">
                     <div>
                       <p class="text-xs uppercase tracking-[0.2em] text-ink/45">帳號狀態</p>
-                      <h3 class="mt-2 font-serif text-xl">註冊、登入與登出</h3>
+                      <h3 class="mt-2 font-serif text-xl">目前帳號</h3>
                     </div>
                     <Cloud class="h-4 w-4 text-ink/40" />
                   </div>
 
                   <div v-if="!isSupabaseEnabled" class="space-y-3 text-sm leading-6 text-ink/65">
-                    <p>目前尚未填入 Supabase 環境變數，所以這個部署版本會先以 Demo 模式運作。</p>
-                    <p>只要補上 `VITE_SUPABASE_URL` 與 `VITE_SUPABASE_ANON_KEY`，這裡就會變成正式帳號流程。</p>
+                    <p>目前為本機測試模式。請在環境變數設定 Supabase 即可開啟正式連線。</p>
                   </div>
 
                   <div v-else-if="isAuthenticated" class="space-y-4">
                     <div class="soft-card rounded-[20px] px-4 py-4">
-                      <p class="text-xs uppercase tracking-[0.18em] text-ink/45">目前帳號</p>
+                      <p class="text-xs uppercase tracking-[0.18em] text-ink/45">電子信箱</p>
                       <p class="mt-2 text-sm text-ink/72">{{ user?.email }}</p>
                     </div>
-                    <button class="ghost-button" @click="signOutNow">
+                    <button class="ghost-button w-full text-red-500/80 hover:bg-red-50" @click="signOutNow">
                       <LogOut class="h-4 w-4" />
-                      <span>登出</span>
+                      <span>登出帳號</span>
                     </button>
-                  </div>
-
-                  <div v-else class="space-y-4">
-                    <div class="flex flex-wrap gap-2">
-                      <button
-                        class="segmented-button"
-                        :class="{ 'segmented-active': accountMode === 'signin' }"
-                        @click="accountMode = 'signin'"
-                      >
-                        登入
-                      </button>
-                      <button
-                        class="segmented-button"
-                        :class="{ 'segmented-active': accountMode === 'signup' }"
-                        @click="accountMode = 'signup'"
-                      >
-                        註冊
-                      </button>
-                    </div>
-
-                    <div class="grid gap-4">
-                      <label class="field">
-                        <span>Email</span>
-                        <input v-model="accountForm.email" type="email" placeholder="you@example.com" />
-                      </label>
-                      <label v-if="accountMode === 'signup'" class="field">
-                        <span>暱稱</span>
-                        <input v-model="accountForm.nickname" type="text" placeholder="顯示在對方畫面上的名字" />
-                      </label>
-                      <label class="field">
-                        <span>密碼</span>
-                        <input v-model="accountForm.password" type="password" placeholder="至少 6 個字元" />
-                      </label>
-                    </div>
-
-                    <p v-if="authErrorMessage" class="text-sm text-ink/60">{{ authErrorMessage }}</p>
-
-                    <div class="flex justify-end">
-                      <button class="primary-button" :disabled="isBusy" @click="handleAccountSubmit">
-                        {{ accountMode === 'signin' ? '登入帳號' : '建立帳號' }}
-                      </button>
-                    </div>
                   </div>
                 </article>
               </div>

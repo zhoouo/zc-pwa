@@ -10,6 +10,7 @@ export type RedemptionStatus = 'redeemed' | 'in_progress' | 'fulfilled' | 'cance
 
 export interface Profile {
   id: UserId
+  realId?: string
   name: string
   title: string
   avatarUrl?: null | string
@@ -87,6 +88,7 @@ export interface BindingInfo {
 
 export interface AppState {
   isSetupComplete: boolean
+  coupleId?: string
   currentUserId: UserId
   profiles: Profile[]
   tasks: Task[]

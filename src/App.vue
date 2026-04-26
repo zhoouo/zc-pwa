@@ -19,7 +19,12 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  Info
+  Info,
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff
 } from 'lucide-vue-next'
 
 import PersonChip from './components/PersonChip.vue'
@@ -85,6 +90,7 @@ const {
   loading: authLoading,
   metadata,
   signIn,
+  signUp,
   signOut,
   updateMetadata,
   uploadAvatar,
@@ -100,6 +106,7 @@ const shopSubView = ref<ShopSubView>('browse')
 const ledgerSubView = ref<LedgerSubView>('overview')
 const settingsSubView = ref<SettingsSubView>('account')
 const accountMode = ref<'signin' | 'signup'>('signin')
+const showPassword = ref(false)
 const hiddenTapCount = ref(0)
 const hiddenUnlocked = ref(false)
 const rejectionDraft = ref<Record<string, string>>({})
@@ -764,52 +771,127 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 
 <template>
   <!-- 登入牆 -->
-  <div v-if="showAuthWall" class="flex min-h-screen items-center justify-center bg-paper bg-mesh px-4">
-    <div class="glass-panel w-full max-w-md space-y-8 rounded-[28px] p-8 sm:p-10">
-      <div class="text-center">
-        <h1 class="font-serif text-3xl font-medium text-ink">ZC</h1>
-        <p class="mt-2 text-sm uppercase tracking-[0.2em] text-ink/45">Private Ritual</p>
+  <div v-if="showAuthWall" class="flex min-h-screen items-center justify-center bg-paper bg-mesh px-4 py-12">
+    <transition name="page-fade" mode="out-in">
+      <div :key="accountMode" class="glass-panel w-full max-w-md space-y-8 rounded-[32px] p-8 shadow-2xl shadow-ink/5 sm:p-10">
+        <div class="text-center space-y-2">
+          <div class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-ink/5 text-ink/80 mb-2">
+            <LockKeyhole v-if="accountMode === 'signin'" class="h-6 w-6" />
+            <Sparkles v-else class="h-6 w-6" />
+          </div>
+          <h1 class="font-serif text-3xl font-medium text-ink tracking-tight">
+            {{ accountMode === 'signin' ? '歡迎回來' : '建立專屬空間' }}
+          </h1>
+          <p class="text-xs uppercase tracking-[0.25em] text-ink/40">Private Ritual • ZC</p>
+        </div>
+
+        <div class="flex rounded-[22px] bg-white/40 p-1.5 backdrop-blur-sm border border-white/60">
+          <button
+            class="flex-1 rounded-[18px] py-2.5 text-sm font-medium transition-all duration-500"
+            :class="accountMode === 'signin' ? 'bg-ink text-mist shadow-lg shadow-ink/10' : 'text-ink/50 hover:bg-white/60'"
+            @click="accountMode = 'signin'"
+          >
+            登入
+          </button>
+          <button
+            class="flex-1 rounded-[18px] py-2.5 text-sm font-medium transition-all duration-500"
+            :class="accountMode === 'signup' ? 'bg-ink text-mist shadow-lg shadow-ink/10' : 'text-ink/50 hover:bg-white/60'"
+            @click="accountMode = 'signup'"
+          >
+            註冊
+          </button>
+        </div>
+
+        <form @submit.prevent="handleAccountSubmit" class="space-y-6">
+          <div class="space-y-4">
+            <div v-if="accountMode === 'signup'" class="field-group">
+              <label class="field-label">您的暱稱</label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink/30">
+                  <User class="h-5 w-5" />
+                </span>
+                <input 
+                  v-model="accountForm.nickname" 
+                  type="text" 
+                  class="auth-input"
+                  placeholder="怎麼稱呼您？" 
+                  required 
+                />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">電子信箱</label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink/30">
+                  <Mail class="h-5 w-5" />
+                </span>
+                <input 
+                  v-model="accountForm.email" 
+                  type="email" 
+                  class="auth-input"
+                  placeholder="hello@example.com" 
+                  required 
+                />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">密碼</label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-ink/30">
+                  <Lock class="h-5 w-5" />
+                </span>
+                <input 
+                  v-model="accountForm.password" 
+                  :type="showPassword ? 'text' : 'password'" 
+                  class="auth-input"
+                  placeholder="至少 6 個字元" 
+                  required 
+                  minlength="6" 
+                />
+                <button 
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute right-4 top-1/2 -translate-y-1/2 text-ink/30 hover:text-ink/60 transition-colors"
+                >
+                  <Eye v-if="!showPassword" class="h-5 w-5" />
+                  <EyeOff v-else class="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <transition name="fade">
+            <div v-if="authErrorMessage" class="flex items-center gap-2 rounded-xl bg-red-50/50 px-4 py-3 text-sm text-red-500/80 border border-red-100/50">
+              <AlertCircle class="h-4 w-4 shrink-0" />
+              <p>{{ authErrorMessage }}</p>
+            </div>
+          </transition>
+
+          <div class="pt-2">
+            <button 
+              type="submit" 
+              class="primary-button w-full justify-center !py-4 !text-base !rounded-[22px] shadow-xl shadow-ink/10 active:scale-[0.98]" 
+              :disabled="isBusy"
+            >
+              <span v-if="isBusy" class="flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4 text-mist" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                處理中...
+              </span>
+              <span v-else>{{ accountMode === 'signin' ? '登入帳號' : '建立帳號' }}</span>
+            </button>
+          </div>
+          
+          <p class="text-center text-[13px] text-ink/35">
+            {{ accountMode === 'signin' ? '還沒有帳號嗎？切換到註冊來建立一個。' : '已經有帳號了？直接登入即可。' }}
+          </p>
+        </form>
       </div>
-
-      <div class="flex rounded-[20px] bg-white/40 p-1">
-        <button
-          class="flex-1 rounded-[16px] py-2 text-sm transition"
-          :class="accountMode === 'signin' ? 'bg-ink text-mist' : 'text-ink/60 hover:bg-white/60'"
-          @click="accountMode = 'signin'"
-        >
-          登入
-        </button>
-        <button
-          class="flex-1 rounded-[16px] py-2 text-sm transition"
-          :class="accountMode === 'signup' ? 'bg-ink text-mist' : 'text-ink/60 hover:bg-white/60'"
-          @click="accountMode = 'signup'"
-        >
-          註冊
-        </button>
-      </div>
-
-      <form @submit.prevent="handleAccountSubmit" class="space-y-5">
-        <label v-if="accountMode === 'signup'" class="field">
-          <span>您的暱稱</span>
-          <input v-model="accountForm.nickname" type="text" placeholder="怎麼稱呼您？" required />
-        </label>
-        <label class="field">
-          <span>電子信箱</span>
-          <input v-model="accountForm.email" type="email" placeholder="hello@example.com" required />
-        </label>
-        <label class="field">
-          <span>密碼</span>
-          <input v-model="accountForm.password" type="password" placeholder="至少 6 個字元" required minlength="6" />
-        </label>
-
-        <p v-if="authErrorMessage" class="text-sm text-red-500/80">{{ authErrorMessage }}</p>
-
-        <button type="submit" class="primary-button w-full justify-center !py-3.5 !text-base" :disabled="authLoading">
-          <span v-if="authLoading">處理中...</span>
-          <span v-else>{{ accountMode === 'signin' ? '登入帳號' : '建立帳號' }}</span>
-        </button>
-      </form>
-    </div>
+    </transition>
   </div>
 
   <!-- 應用主體 -->

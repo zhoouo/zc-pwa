@@ -4,7 +4,7 @@
 
 `ZC` 是一款專為情侶設計的 PWA（漸進式 Web 應用）。它將日常的互相照顧與承諾，轉化為一種有溫度、有紀錄、且具備儀式感的互動循環。
 
-![ZC Banner](../public/pwa-512.png)
+![ZC Banner](public/pwa-512.png)
 
 ## ✨ 核心理念
 

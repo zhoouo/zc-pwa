@@ -25,6 +25,7 @@ const defaultAppearance = (): AppearanceSettings => ({
 })
 
 const defaultState = (): AppState => ({
+  isInitializing: false,
   isSetupComplete: false,
   coupleId: undefined,
   currentUserId: 'self',
@@ -43,7 +44,10 @@ const defaultState = (): AppState => ({
   }
 })
 
-const state = reactive<AppState>(defaultState())
+const state = reactive<AppState>({
+  ...defaultState(),
+  isInitializing: true // 初始狀態設為載入中
+})
 let realtimeChannel: RealtimeChannel | null = null
 
 const getBalance = (userId: UserId) =>
@@ -107,29 +111,57 @@ export const useCoupleApp = () => {
   const fetchData = async (silent = false) => {
     if (!supabase) return
 
-    if (!silent) state.isSetupComplete = false // 觸發全屏加載 (可選)
+    if (!silent) state.isInitializing = true
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) {
+      state.isInitializing = false
       Object.assign(state, defaultState())
       return
     }
 
     const myUid = session.user.id
 
-    // 取得配對狀態 (僅在非 silent 或 coupleId 遺失時抓取)
+    // 取得配對狀態
     let coupleId = state.coupleId
     if (!coupleId || !silent) {
-      const { data: memberData } = await supabase
+      // 這裡改成抓取所有相關空間，處理可能重複建立的情況
+      const { data: memberships } = await supabase
         .from('couple_members')
         .select('couple_id')
         .eq('user_id', myUid)
-        .maybeSingle()
       
-      coupleId = memberData?.couple_id
+      if (memberships && memberships.length > 0) {
+        if (memberships.length === 1) {
+          coupleId = memberships[0].couple_id
+        } else {
+          // 如果有多個空間，優先尋找已經有兩人的那個（完整空間）
+          const { data: spaceStats } = await supabase
+            .from('couple_members')
+            .select('couple_id')
+            .in('couple_id', memberships.map(m => m.couple_id))
+          
+          const counts: Record<string, number> = {}
+          spaceStats?.forEach(s => {
+            counts[s.couple_id] = (counts[s.couple_id] || 0) + 1
+          })
+          
+          // 找人數最多的空間
+          const bestSpace = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+          coupleId = bestSpace[0]
+          console.warn('Detected multiple spaces, choosing most populated:', coupleId)
+          
+          // 非同步清理孤兒空間，不阻塞主流程
+          setTimeout(() => {
+            const { cleanupOrphanSpaces } = useCoupleApp()
+            cleanupOrphanSpaces()
+          }, 1000)
+        }
+      }
     }
 
     if (!coupleId) {
+      state.isInitializing = false
       Object.assign(state, { ...defaultState(), currentUserId: 'self' })
       const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', myUid).single()
       if (myProfile) {
@@ -252,6 +284,7 @@ export const useCoupleApp = () => {
 
     // 初始化即時更新
     subscribeToChanges(coupleId)
+    state.isInitializing = false
   }
 
   const subscribeToChanges = (coupleId: string) => {
@@ -639,6 +672,7 @@ export const useCoupleApp = () => {
   }
 
   const resetState = () => {
+    state.isInitializing = false
     state.coupleId = null
     state.currentUserId = 'self'
     state.profiles = [
@@ -743,6 +777,29 @@ export const useCoupleApp = () => {
     redeemItem,
     updateRedemptionStatus,
     deleteSpace,
+    cleanupOrphanSpaces: async () => {
+      if (!supabase) return
+      const myUid = state.profiles[0].realId
+      if (!myUid) return
+      
+      // 找出所有我加入的空間
+      const { data: memberships } = await supabase.from('couple_members').select('couple_id').eq('user_id', myUid)
+      if (!memberships || memberships.length <= 1) return
+      
+      // 排除目前正在使用的空間
+      const otherSpaces = memberships.filter(m => m.couple_id !== state.coupleId)
+      
+      for (const space of otherSpaces) {
+        // 檢查該空間是否只有我一個人 (孤兒空間)
+        const { count } = await supabase.from('couple_members').select('*', { count: 'exact', head: true }).eq('couple_id', space.couple_id)
+        if (count === 1) {
+          // 如果只有我，則可以安全刪除這個成員關係（以及空間）
+          await supabase.from('couple_members').delete().eq('couple_id', space.couple_id).eq('user_id', myUid)
+          // 注意：如果我是 owner，刪除 member 可能會觸發 cascade 刪除 couple (取決於 schema)
+        }
+      }
+      await fetchData(true)
+    },
     generateInviteCode,
     resetState
   }

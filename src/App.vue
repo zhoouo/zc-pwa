@@ -770,6 +770,28 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 </script>
 
 <template>
+  <!-- 啟動開屏動畫 -->
+  <transition name="fade">
+    <div v-if="state.isInitializing || authLoading" class="fixed inset-0 z-[100] flex items-center justify-center bg-paper bg-mesh">
+      <div class="flex flex-col items-center gap-6">
+        <div class="relative">
+          <div class="absolute inset-0 bg-gold/20 blur-3xl rounded-full animate-pulse"></div>
+          <div class="relative glass-panel rounded-[32px] p-8 shadow-2xl shadow-ink/5">
+            <Sparkles class="h-12 w-12 text-gold animate-soft-bounce" />
+          </div>
+        </div>
+        <div class="text-center space-y-2">
+          <h2 class="font-serif text-2xl tracking-[0.3em] text-ink/80">ZC</h2>
+          <div class="flex items-center gap-3">
+            <div class="h-[1px] w-4 bg-ink/20"></div>
+            <p class="text-[10px] uppercase tracking-[0.5em] text-ink/40">Private Ritual</p>
+            <div class="h-[1px] w-4 bg-ink/20"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </transition>
+
   <!-- 登入牆 -->
   <div v-if="showAuthWall" class="flex min-h-screen items-center justify-center bg-paper bg-mesh px-4 py-12">
     <transition name="page-fade" mode="out-in">
@@ -963,7 +985,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
           <div class="soft-card flex flex-col gap-4 rounded-[24px] px-5 py-6">
             <h3 class="font-serif text-xl">建立新空間</h3>
             <p class="text-sm text-ink/65">開啟一個全新的記帳空間，並產生邀請碼給對方。</p>
-            <button class="primary-button mt-auto justify-center" @click="handleCreateSpace" :disabled="isBusy">建立空間</button>
+            <button class="primary-button mt-auto justify-center" @click="handleCreateSpace" :disabled="isBusy">
+              <span v-if="isBusy && !setupForm.inviteCode" class="flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                建立中...
+              </span>
+              <span v-else>建立空間</span>
+            </button>
           </div>
           
           <div class="soft-card flex flex-col gap-4 rounded-[24px] px-5 py-6">
@@ -972,7 +1000,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
             <label class="field mt-auto">
               <input v-model="setupForm.inviteCode" type="text" placeholder="例如：PAIR-XXXXX" />
             </label>
-            <button class="primary-button justify-center" @click="handleJoinSpace" :disabled="isBusy">加入空間</button>
+            <button class="primary-button justify-center" @click="handleJoinSpace" :disabled="isBusy">
+              <span v-if="isBusy && setupForm.inviteCode" class="flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                加入中...
+              </span>
+              <span v-else>加入空間</span>
+            </button>
           </div>
         </div>
       </section>

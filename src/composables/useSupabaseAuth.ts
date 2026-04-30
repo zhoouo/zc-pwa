@@ -4,9 +4,9 @@ import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseEnabled, supabase } from '../lib/supabase'
 
 type UserMetadata = {
-  avatar_url?: string
-  nickname?: string
-  title?: string
+  avatar_url?: null | string
+  nickname?: null | string
+  title?: null | string
 }
 
 const loading = ref(true)
@@ -128,12 +128,15 @@ export const useSupabaseAuth = () => {
           const ctx = canvas.getContext('2d')
           ctx?.drawImage(img, 0, 0, width, height)
 
+          const keepsTransparency = file.type === 'image/png' || file.type === 'image/webp'
+          const outputType = keepsTransparency ? file.type : 'image/jpeg'
+
           canvas.toBlob(
             (blob) => {
               if (blob) resolve(blob)
               else reject(new Error('Canvas to Blob failed'))
             },
-            'image/jpeg',
+            outputType,
             quality
           )
         }
@@ -148,13 +151,16 @@ export const useSupabaseAuth = () => {
       return { error: '尚未設定 Supabase 或未登入。' }
     }
 
-    const extension = originalName?.split('.').pop() || 'jpg'
+    const blobType = file.type || 'image/jpeg'
+    const fallbackExtension =
+      blobType === 'image/png' ? 'png' : blobType === 'image/webp' ? 'webp' : 'jpg'
+    const extension = originalName?.split('.').pop() || fallbackExtension
     const fileName = `${Date.now()}.${extension}`
     const path = `${user.value.id}/${fileName}`
 
     const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
       cacheControl: '3600',
-      contentType: file instanceof File ? file.type : 'image/jpeg',
+      contentType: blobType,
       upsert: true
     })
 

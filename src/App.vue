@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import {
-  ArrowLeftRight,
   CheckCheck,
   Cloud,
-  Coins,
   Gift,
   Home,
   LibraryBig,
@@ -14,12 +12,10 @@ import {
   ScrollText,
   Settings2,
   Sparkles,
-  ChevronDown,
   ChevronUp,
   AlertCircle,
   CheckCircle2,
   X,
-  Info,
   Mail,
   Lock,
   User,
@@ -30,7 +26,6 @@ import {
 import PersonChip from './components/PersonChip.vue'
 import SectionTabs from './components/SectionTabs.vue'
 import DatePicker from './components/DatePicker.vue'
-import CustomSelect from './components/CustomSelect.vue'
 import { useCoupleApp } from './composables/useCoupleApp'
 import { useSupabaseAuth } from './composables/useSupabaseAuth'
 import ConfirmModal from './components/ConfirmModal.vue'
@@ -39,7 +34,7 @@ import type {
   GlassMode,
   MotionMode,
   Profile,
-  SetupForm,
+  Task,
   UserId
 } from './types'
 
@@ -65,19 +60,22 @@ const {
   fetchData,
   createSpace,
   joinSpace,
-  getInviteCode,
-  switchPerspective,
   updateProfile,
   updateAppearance,
   createTask,
+  updateTask,
+  deleteTask,
+  acceptTask,
   submitTask,
   rejectTask,
   approveTask,
+  clearCompletedTask,
   createShopItem,
   toggleItemVisibility,
   deleteShopItem,
   redeemItem,
   updateRedemptionStatus,
+  cancelRedemption,
   deleteSpace,
   generateInviteCode,
   resetState
@@ -111,6 +109,10 @@ const hiddenTapCount = ref(0)
 const hiddenUnlocked = ref(false)
 const rejectionDraft = ref<Record<string, string>>({})
 const redemptionNote = ref<Record<string, string>>({})
+const editingTaskId = ref<string | null>(null)
+const shopImageInput = ref<HTMLInputElement | null>(null)
+const wishImageInput = ref<HTMLInputElement | null>(null)
+const avatarInput = ref<HTMLInputElement | null>(null)
 const banner = reactive({
   text: 'ヾ(^▽^*))',
   type: 'info' as 'info' | 'success' | 'error',
@@ -153,7 +155,15 @@ const confirmModal = reactive({
   onConfirm: () => {}
 })
 
-const openConfirm = (config: { title: string; message: string; confirmText?: string; variant?: 'primary' | 'danger'; onConfirm: () => void }) => {
+const noticeModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  confirmText: '知道了',
+  variant: 'primary' as 'primary' | 'danger'
+})
+
+const openConfirm = (config: { title: string; message: string; confirmText?: string; variant?: 'primary' | 'danger'; onConfirm: () => void | Promise<void> }) => {
   confirmModal.title = config.title
   confirmModal.message = config.message
   confirmModal.confirmText = config.confirmText || '確定'
@@ -165,6 +175,14 @@ const openConfirm = (config: { title: string; message: string; confirmText?: str
   confirmModal.show = true
 }
 
+const openNotice = (config: { title: string; message: string; confirmText?: string; variant?: 'primary' | 'danger' }) => {
+  noticeModal.title = config.title
+  noticeModal.message = config.message
+  noticeModal.confirmText = config.confirmText || '知道了'
+  noticeModal.variant = config.variant || 'primary'
+  noticeModal.show = true
+}
+
 const setupForm = reactive({
   inviteCode: ''
 })
@@ -173,7 +191,16 @@ const taskForm = reactive({
   title: '',
   description: '',
   coinReward: 30,
-  dueAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  dueAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  isRecurring: false
+})
+
+const taskEditDraft = reactive({
+  title: '',
+  description: '',
+  coinReward: 0,
+  dueAt: '',
+  isRecurring: false
 })
 
 const shopForm = reactive({
@@ -239,14 +266,13 @@ watch(
 )
 
 const actionableTasks = computed(() =>
-  tasksAssignedToMe.value.filter((task) => task.status === 'open' || task.status === 'rejected')
+  tasksAssignedToMe.value.filter((task) => task.status === 'open' || task.status === 'accepted' || task.status === 'rejected')
 )
 
 const homeTaskCount = computed(() => actionableTasks.value.length)
 
 const homeRedemptionCount = computed(
-  () => myRedemptions.value.filter((entry) => entry.creatorId === state.currentUserId && entry.status !== 'fulfilled')
-    .length
+  () => myRedemptions.value.filter((entry) => entry.creatorId === state.currentUserId && !isHiddenRedemption(entry.id)).length
 )
 
 const visibleShopItems = computed(() =>
@@ -261,6 +287,28 @@ const incomingRedemptions = computed(() =>
 
 const outgoingRedemptions = computed(() =>
   myRedemptions.value.filter((entry) => entry.redeemerId === state.currentUserId)
+)
+
+const isTaskFormValid = computed(() =>
+  Boolean(taskForm.title.trim()) &&
+  Number.isFinite(taskForm.coinReward) &&
+  taskForm.coinReward >= 0
+)
+
+const isTaskEditValid = computed(() =>
+  Boolean(taskEditDraft.title.trim()) &&
+  Number.isFinite(taskEditDraft.coinReward) &&
+  taskEditDraft.coinReward >= 0
+)
+
+const isHiddenRedemption = (redemptionId: string) => {
+  const redemption = state.redemptions.find((entry) => entry.id === redemptionId)
+  const item = state.shopItems.find((shopItem) => shopItem.id === redemption?.shopItemId)
+  return Boolean(item?.isHidden)
+}
+
+const homeRedemptions = computed(() =>
+  myRedemptions.value.filter((entry) => !isHiddenRedemption(entry.id)).slice(0, 4)
 )
 
 const wishItems = computed(() =>
@@ -310,6 +358,16 @@ const switchMainView = (view: ViewKey) => {
   activeView.value = view
 }
 
+const switchTaskView = (subView: TaskSubView) => {
+  activeView.value = 'tasks'
+  taskSubView.value = subView
+}
+
+const switchShopView = (subView: ShopSubView) => {
+  activeView.value = 'shop'
+  shopSubView.value = subView
+}
+
 const appShellClasses = computed(() => [
   state.appearance.density === 'compact' ? 'density-compact' : 'density-airy',
   state.appearance.motion === 'still' ? 'motion-still' : 'motion-soft',
@@ -344,6 +402,7 @@ const formatDateTime = (value: string) =>
 const getTaskTone = (status: string) =>
   ({
     open: 'bg-white/60 text-ink/75',
+    accepted: 'bg-sage/12 text-sage',
     submitted: 'bg-gold/15 text-gold',
     approved: 'bg-sage/20 text-sage',
     rejected: 'bg-ink/10 text-ink',
@@ -352,7 +411,8 @@ const getTaskTone = (status: string) =>
 
 const getTaskLabel = (status: string) =>
   ({
-    open: '待完成',
+    open: '待接取',
+    accepted: '進行中',
     submitted: '待審核',
     approved: '已通過',
     rejected: '已退回',
@@ -455,19 +515,46 @@ const handleGenerateInvite = async () => {
   }
 }
 
+const resetTaskForm = () => {
+  taskForm.title = ''
+  taskForm.description = ''
+  taskForm.coinReward = 30
+  taskForm.dueAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  taskForm.isRecurring = false
+}
+
+const createTaskNow = async () => {
+  isBusy.value = true
+  const result = await createTask({ ...taskForm, assigneeId: 'partner' })
+  isBusy.value = false
+
+  if (result.error) {
+    pushNotify(`任務建立失敗：${result.error}`, 'error')
+    return
+  }
+
+  resetTaskForm()
+  taskSubView.value = 'created'
+  pushNotify('任務已送進清單，等對方接取後就能開始。', 'success')
+}
+
 const handleCreateTask = () => {
   if (!taskForm.title.trim()) {
     pushNotify('任務至少要有標題。', 'info')
     return
   }
 
-  createTask({ ...taskForm, assigneeId: 'partner' })
-  taskForm.title = ''
-  taskForm.description = ''
-  taskForm.coinReward = 30
-  taskForm.dueAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
-  taskSubView.value = 'created'
-  pushNotify('任務已送進清單，接下來就等對方完成。', 'success')
+  if (taskForm.coinReward < 0) {
+    pushNotify('金幣不能為負數。', 'info')
+    return
+  }
+
+  openConfirm({
+    title: '送出任務',
+    message: `確定要把「${taskForm.title.trim()}」發給 ${profileMap.value.partner.name} 嗎？對方接取後才能送出批准。`,
+    confirmText: '送出任務',
+    onConfirm: createTaskNow
+  })
 }
 
 const handleShopImageChange = async (event: Event) => {
@@ -476,6 +563,166 @@ const handleShopImageChange = async (event: Event) => {
   shopForm.rawFile = file
   const url = await readFileAsDataUrl(file)
   shopImagePreview.value = url
+}
+
+const handleAcceptTask = (task: Task) => {
+  openConfirm({
+    title: '接取任務',
+    message: `確定要接下「${task.title}」嗎？接取後就會出現送出批准的按鈕。`,
+    confirmText: '接取',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await acceptTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        const needsMigration = result.error.includes('tasks_status_check')
+        pushNotify(
+          needsMigration
+            ? '接取失敗：雲端資料庫還沒更新任務狀態規則，請先執行 supabase/migrations/202605010020_task_acceptance_and_settings.sql。'
+            : `接取失敗：${result.error}`,
+          'error',
+          needsMigration ? 9000 : 4000
+        )
+        return
+      }
+      pushNotify('任務已接取，可以完成後送出批准。', 'success')
+    }
+  })
+}
+
+const handleSubmitTask = (task: Task) => {
+  openConfirm({
+    title: '送出批准',
+    message: `確定要把「${task.title}」送給 ${personById(task.creatorId).name} 批准嗎？`,
+    confirmText: '送出批准',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await submitTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`送出失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify('已送出批准，等對方確認。', 'success')
+    }
+  })
+}
+
+const handleRejectTask = (task: Task) => {
+  openConfirm({
+    title: '退回任務',
+    message: `確定要退回「${task.title}」嗎？退回原因會同步給對方。`,
+    confirmText: '退回',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await rejectTask(task.id, rejectionDraft[task.id] || '還差一點，再補一下。')
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`退回失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify('已退回給對方。', 'info')
+    }
+  })
+}
+
+const handleApproveTask = (task: Task) => {
+  openConfirm({
+    title: '批准任務',
+    message: `確定通過「${task.title}」並發放 ${currency(task.coinReward)} 嗎？`,
+    confirmText: '通過並發放',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await approveTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`批准失敗：${result.error}`, 'error')
+        return
+      }
+      openNotice({
+        title: '任務已通過',
+        message: '金幣已發放。這筆完成任務會留在「他完成啦」，確認後可以收起。'
+      })
+    }
+  })
+}
+
+const handleClearCompletedTask = (task: Task) => {
+  openConfirm({
+    title: task.isRecurring ? '再次開放常駐任務' : '收起完成任務',
+    message: task.isRecurring
+      ? `「${task.title}」會回到進行中，之後可以再次送出批准。`
+      : `「${task.title}」會從任務清單刪除。`,
+    confirmText: task.isRecurring ? '再次開放' : '收起並刪除',
+    variant: task.isRecurring ? 'primary' : 'danger',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await clearCompletedTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`處理失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify(task.isRecurring ? '常駐任務已再次開放。' : '完成任務已收起。', 'success')
+    }
+  })
+}
+
+const startEditTask = (task: Task) => {
+  editingTaskId.value = task.id
+  taskEditDraft.title = task.title
+  taskEditDraft.description = task.description
+  taskEditDraft.coinReward = task.coinReward
+  taskEditDraft.dueAt = task.dueAt
+  taskEditDraft.isRecurring = task.isRecurring
+}
+
+const cancelEditTask = () => {
+  editingTaskId.value = null
+}
+
+const saveTaskEdit = async (taskId: string) => {
+  if (!isTaskEditValid.value) {
+    pushNotify('請確認任務標題存在，且金幣不是負數。', 'info')
+    return
+  }
+
+  isBusy.value = true
+  const result = await updateTask(taskId, taskEditDraft)
+  isBusy.value = false
+  if (result.error) {
+    pushNotify(`更新失敗：${result.error}`, 'error')
+    return
+  }
+
+  editingTaskId.value = null
+  pushNotify('任務已更新。', 'success')
+}
+
+const handleDeleteTask = (task: Task) => {
+  openConfirm({
+    title: '刪除任務',
+    message: `確定要刪除「${task.title}」嗎？只有尚未接取的任務可以刪除。`,
+    confirmText: '刪除任務',
+    variant: 'danger',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await deleteTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`刪除失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify('任務已刪除。', 'info')
+    }
+  })
+}
+
+const removeShopImage = () => {
+  shopForm.rawFile = null
+  shopForm.imageUrl = ''
+  shopImagePreview.value = null
+  if (shopImageInput.value) shopImageInput.value.value = ''
 }
 
 const handleCreateShopItem = async () => {
@@ -526,9 +773,7 @@ const handleCreateShopItem = async () => {
       shopForm.price = 120
       shopForm.category = '日常'
       shopForm.isHidden = false
-      shopForm.rawFile = null
-      shopForm.imageUrl = ''
-      shopImagePreview.value = null
+      removeShopImage()
       shopSubView.value = 'mine'
       pushNotify('願望已實現並成功上架！', 'success')
     }
@@ -540,15 +785,97 @@ const handleCreateShopItem = async () => {
 }
 
 const handleRedeem = (itemId: string) => {
-  const result = redeemItem(itemId, redemptionNote.value[itemId] ?? '')
-  if (!result.ok) {
-    pushNotify(result.reason, 'error')
+  const item = state.shopItems.find((shopItem) => shopItem.id === itemId)
+  if (!item) {
+    pushNotify('商品不存在。', 'error')
     return
   }
 
-  redemptionNote.value[itemId] = ''
-  shopSubView.value = 'orders'
-  pushNotify('已建立兌換單，也替你把金幣扣好了。', 'success')
+  if (balances.value[state.currentUserId] < item.price) {
+    pushNotify('目前金幣不足，不能兌換這個項目。', 'error')
+    return
+  }
+
+  openConfirm({
+    title: '確認兌換',
+    message: `確定要花 ${currency(item.price)} 兌換「${item.title}」嗎？確認後會建立兌換單並扣除金幣。`,
+    confirmText: '立即兌換',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await redeemItem(itemId, redemptionNote.value[itemId] ?? '')
+      isBusy.value = false
+      if (!result.ok) {
+        pushNotify(result.reason, 'error')
+        return
+      }
+
+      redemptionNote.value[itemId] = ''
+      shopSubView.value = 'orders'
+      openNotice({
+        title: '兌換單已送出',
+        message: '兌換狀態會在應用內即時更新；如果按錯，也可以在兌換單裡取消。'
+      })
+    }
+  })
+}
+
+const handleUpdateRedemptionStatus = (redemptionId: string, status: 'in_progress' | 'fulfilled') => {
+  const redemption = state.redemptions.find((entry) => entry.id === redemptionId)
+  const item = state.shopItems.find((shopItem) => shopItem.id === redemption?.shopItemId)
+  if (!redemption) return
+
+  openConfirm({
+    title: status === 'fulfilled' ? '完成兌換單' : '更新兌換狀態',
+    message:
+      status === 'fulfilled'
+        ? `確定「${item?.title || '這張兌換單'}」已經完成嗎？確認後它會從兌換單列表消失。`
+        : `確定要把「${item?.title || '這張兌換單'}」標記為待履行嗎？`,
+    confirmText: status === 'fulfilled' ? '確認完成' : '標記待履行',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await updateRedemptionStatus(redemptionId, status)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`更新失敗：${result.error}`, 'error')
+        return
+      }
+
+      if (status === 'fulfilled') {
+        openNotice({
+          title: '兌換單已完成',
+          message: '這張兌換單已確認完成，會從列表中收起。'
+        })
+      } else {
+        pushNotify('兌換單狀態已更新。', 'success')
+      }
+    }
+  })
+}
+
+const handleCancelRedemption = (redemptionId: string) => {
+  const redemption = state.redemptions.find((entry) => entry.id === redemptionId)
+  const item = state.shopItems.find((shopItem) => shopItem.id === redemption?.shopItemId)
+  if (!redemption) return
+
+  openConfirm({
+    title: '取消兌換單',
+    message: `確定要取消「${item?.title || '這張兌換單'}」嗎？已扣除的金幣會退回給兌換者。`,
+    confirmText: '取消兌換',
+    variant: 'danger',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await cancelRedemption(redemptionId)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`取消失敗：${result.error}`, 'error')
+        return
+      }
+      openNotice({
+        title: '兌換單已取消',
+        message: '兌換單已收起，金幣也已退回。'
+      })
+    }
+  })
 }
 
 const handleHiddenTap = () => {
@@ -565,6 +892,13 @@ const handleWishImageChange = async (event: Event) => {
   wishForm.rawFile = file
   const url = await readFileAsDataUrl(file)
   wishImagePreview.value = url
+}
+
+const removeWishImage = () => {
+  wishForm.rawFile = null
+  wishForm.imageUrl = ''
+  wishImagePreview.value = null
+  if (wishImageInput.value) wishImageInput.value.value = ''
 }
 
 const handleAddWish = async () => {
@@ -609,9 +943,7 @@ const handleAddWish = async () => {
     } else {
       wishForm.title = ''
       wishForm.description = ''
-      wishForm.imageUrl = ''
-      wishForm.rawFile = null
-      wishImagePreview.value = null
+      removeWishImage()
       isWishFormExpanded.value = false
       pushNotify('願望已放入許願池 ♥', 'success')
     }
@@ -620,11 +952,6 @@ const handleAddWish = async () => {
   } finally {
     isBusy.value = false
   }
-}
-
-const togglePerspective = (userId: UserId) => {
-  switchPerspective(userId)
-  pushNotify(`目前視角已切換成 ${profileMap.value[userId].name}。`, 'info')
 }
 
 const readFileAsDataUrl = (file: File) =>
@@ -658,6 +985,24 @@ const handleAvatarChange = async (userId: UserId, event: Event) => {
   }
 
   target.value = ''
+}
+
+const removeAvatar = async () => {
+  openConfirm({
+    title: '移除頭像',
+    message: '確定要移除目前頭像嗎？移除後會同步到雲端帳號。',
+    confirmText: '移除',
+    onConfirm: async () => {
+      isBusy.value = true
+      await updateProfile('self', { avatarUrl: null })
+      if (isSupabaseEnabled && isAuthenticated.value) {
+        await updateMetadata({ avatar_url: null })
+      }
+      if (avatarInput.value) avatarInput.value.value = ''
+      isBusy.value = false
+      pushNotify('頭像已移除。', 'success')
+    }
+  })
 }
 
 const saveProfileDraft = async (userId: UserId) => {
@@ -737,9 +1082,15 @@ const deleteAccountNow = () => {
   })
 }
 
-const setDensity = (value: DensityMode) => updateAppearance({ density: value })
-const setMotion = (value: MotionMode) => updateAppearance({ motion: value })
-const setGlass = (value: GlassMode) => updateAppearance({ glass: value })
+const setDensity = (value: DensityMode) => {
+  void updateAppearance({ density: value })
+}
+const setMotion = (value: MotionMode) => {
+  void updateAppearance({ motion: value })
+}
+const setGlass = (value: GlassMode) => {
+  void updateAppearance({ glass: value })
+}
 
 // --- 登入與資料同步邏輯 ---
 const showAuthWall = computed(() => isSupabaseEnabled && !authLoading.value && !isAuthenticated.value)
@@ -1032,7 +1383,10 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <CheckCheck class="h-4 w-4 text-ink/40" />
                     </div>
                     <p class="mt-4 font-serif text-4xl">{{ reviewQueue.length }}</p>
-                    <p class="mt-2 text-sm text-ink/60">他做完啦</p>
+                    <div class="mt-2 flex items-center justify-between gap-3">
+                      <p class="text-sm text-ink/60">他做完啦</p>
+                      <button class="ghost-button !px-3 !py-1.5 text-xs" @click="switchTaskView('review')">快速瀏覽</button>
+                    </div>
                   </article>
 
                   <article class="glass-panel rounded-[28px] px-5 py-5">
@@ -1076,9 +1430,16 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <div class="flex items-center gap-3">
                         <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
                         <button
-                          v-if="task.status === 'open' || task.status === 'rejected'"
+                          v-if="task.status === 'open'"
                           class="primary-button"
-                          @click="submitTask(task.id)"
+                          @click="handleAcceptTask(task)"
+                        >
+                          接取
+                        </button>
+                        <button
+                          v-else-if="task.status === 'accepted' || task.status === 'rejected'"
+                          class="primary-button"
+                          @click="handleSubmitTask(task)"
                         >
                           讓他批准(・∀・)
                         </button>
@@ -1129,7 +1490,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 
                   <div class="space-y-3">
                     <article
-                      v-for="entry in myRedemptions.slice(0, 4)"
+                      v-for="entry in homeRedemptions"
                       :key="entry.id"
                       class="soft-card rounded-[24px] px-4 py-4"
                     >
@@ -1181,9 +1542,16 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <div class="flex flex-col items-start gap-3 sm:items-end">
                         <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
                         <button
-                          v-if="task.status === 'open' || task.status === 'rejected'"
+                          v-if="task.status === 'open'"
                           class="primary-button"
-                          @click="submitTask(task.id)"
+                          @click="handleAcceptTask(task)"
+                        >
+                          接取任務
+                        </button>
+                        <button
+                          v-else-if="task.status === 'accepted' || task.status === 'rejected'"
+                          class="primary-button"
+                          @click="handleSubmitTask(task)"
                         >
                           送出批准
                         </button>
@@ -1200,23 +1568,32 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                   <article v-for="task in reviewQueue" :key="task.id" class="soft-card rounded-[24px] px-4 py-4">
                     <div class="mb-3 flex items-center justify-between gap-3">
                       <div class="space-y-2">
-                        <PersonChip :profile="personById(task.assigneeId)" subtitle="已送出批准" />
+                        <PersonChip :profile="personById(task.assigneeId)" :subtitle="task.status === 'approved' ? '已通過' : '已送出批准'" />
                         <h3 class="font-serif text-xl">{{ task.title }}</h3>
+                        <span v-if="task.isRecurring" class="status-pill bg-gold/15 text-gold">常駐任務</span>
                       </div>
                       <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
                     </div>
                     <p class="text-sm leading-6 text-ink/60">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
-                    <textarea
-                      v-model="rejectionDraft[task.id]"
-                      rows="2"
-                      class="mt-4 w-full rounded-[20px] border border-white/45 bg-white/55 px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-gold/55 focus:bg-white/72"
-                      placeholder="我覺得...這樣不行 (´-ι_-｀)"
-                    />
-                    <div class="mt-4 flex flex-wrap justify-end gap-3">
-                      <button class="ghost-button" @click="rejectTask(task.id, rejectionDraft[task.id] || '還差一點，再補一下。')">
-                        退回
+                    <template v-if="task.status === 'submitted'">
+                      <textarea
+                        v-model="rejectionDraft[task.id]"
+                        rows="2"
+                        class="mt-4 w-full rounded-[20px] border border-white/45 bg-white/55 px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-gold/55 focus:bg-white/72"
+                        placeholder="我覺得...這樣不行 (´-ι_-｀)"
+                      />
+                      <div class="mt-4 flex flex-wrap justify-end gap-3">
+                        <button class="ghost-button" @click="handleRejectTask(task)">
+                          退回
+                        </button>
+                        <button class="primary-button" @click="handleApproveTask(task)">通過，賞 !!!</button>
+                      </div>
+                    </template>
+                    <div v-else class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-sage/20 bg-sage/10 px-4 py-3">
+                      <p class="text-sm text-sage">已通過，金幣已發放。</p>
+                      <button class="primary-button" @click="handleClearCompletedTask(task)">
+                        {{ task.isRecurring ? '再次開放' : '收起完成任務' }}
                       </button>
-                      <button class="primary-button" @click="approveTask(task.id)">通過，賞 !!!</button>
                     </div>
                   </article>
 
@@ -1227,10 +1604,51 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 
                 <div v-else-if="taskSubView === 'created'" class="space-y-3">
                   <article v-for="task in tasksCreatedByMe" :key="task.id" class="soft-card rounded-[24px] px-4 py-4">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div v-if="editingTaskId === task.id" class="grid gap-4">
+                      <label class="field">
+                        <span>標題</span>
+                        <input v-model="taskEditDraft.title" type="text" />
+                      </label>
+                      <label class="field">
+                        <span>描述</span>
+                        <textarea v-model="taskEditDraft.description" rows="3" />
+                      </label>
+                      <div class="grid gap-4 sm:grid-cols-2">
+                        <label class="field">
+                          <span>金幣</span>
+                          <input v-model.number="taskEditDraft.coinReward" type="number" min="0" />
+                        </label>
+                        <label class="field">
+                          <span>截止日</span>
+                          <DatePicker v-model="taskEditDraft.dueAt" />
+                        </label>
+                      </div>
+                      <label class="field field-inline">
+                        <span>常駐任務</span>
+                        <button
+                          type="button"
+                          class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                          :class="taskEditDraft.isRecurring ? 'bg-gold' : 'bg-ink/20'"
+                          @click="taskEditDraft.isRecurring = !taskEditDraft.isRecurring"
+                        >
+                          <span
+                            class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                            :class="taskEditDraft.isRecurring ? 'translate-x-6' : 'translate-x-1'"
+                          />
+                        </button>
+                      </label>
+                      <p v-if="taskEditDraft.coinReward < 0" class="text-sm text-red-500/80">金幣不能為負數。</p>
+                      <div class="flex flex-wrap justify-end gap-3">
+                        <button class="ghost-button" @click="cancelEditTask">取消</button>
+                        <button class="primary-button" :disabled="!isTaskEditValid || isBusy" @click="saveTaskEdit(task.id)">儲存</button>
+                      </div>
+                    </div>
+
+                    <div v-else class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div class="space-y-3">
                         <div class="flex items-center gap-2">
                           <span class="status-pill" :class="getTaskTone(task.status)">{{ getTaskLabel(task.status) }}</span>
+                          <span v-if="task.isRecurring" class="status-pill bg-gold/15 text-gold">常駐</span>
                         </div>
                         <PersonChip :profile="personById(task.assigneeId)" subtitle="執行對象" />
                         <div>
@@ -1238,7 +1656,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           <p class="mt-1 text-sm text-ink/60">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
                         </div>
                       </div>
-                      <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
+                      <div class="flex flex-col items-start gap-2 sm:items-end">
+                        <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
+                        <div v-if="task.status === 'open'" class="flex flex-wrap gap-2">
+                          <button class="ghost-button !py-1.5" @click="startEditTask(task)">編輯</button>
+                          <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50" @click="handleDeleteTask(task)">刪除</button>
+                        </div>
+                      </div>
                     </div>
                   </article>
 
@@ -1259,16 +1683,31 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                   <div class="grid gap-4 sm:grid-cols-2">
                     <label class="field">
                       <span>金幣</span>
-                      <input v-model.number="taskForm.coinReward" type="number" min="1" />
+                      <input v-model.number="taskForm.coinReward" type="number" min="0" />
                     </label>
                     <label class="field">
                       <span>截止日</span>
                       <DatePicker v-model="taskForm.dueAt" />
                     </label>
                   </div>
+                  <label class="field field-inline">
+                    <span>常駐任務</span>
+                    <button
+                      type="button"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                      :class="taskForm.isRecurring ? 'bg-gold' : 'bg-ink/20'"
+                      @click="taskForm.isRecurring = !taskForm.isRecurring"
+                    >
+                      <span
+                        class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                        :class="taskForm.isRecurring ? 'translate-x-6' : 'translate-x-1'"
+                      />
+                    </button>
+                  </label>
+                  <p v-if="taskForm.coinReward < 0" class="text-sm text-red-500/80">金幣不能為負數。</p>
 
                   <div class="mt-2 flex justify-end">
-                    <button class="primary-button" @click="handleCreateTask">去吧 !我的任務</button>
+                    <button class="primary-button" :disabled="!isTaskFormValid || isBusy" @click="handleCreateTask">去吧 !我的任務</button>
                   </div>
                 </div>
               </article>
@@ -1320,7 +1759,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           class="w-full rounded-[20px] border border-white/45 bg-white/55 px-4 py-3 text-sm text-ink outline-none transition placeholder:text-ink/35 focus:border-gold/55 focus:bg-white/72"
                           placeholder="可留一句補充。"
                         />
-                        <button class="primary-button w-full" @click="handleRedeem(item.id)">立即兌換</button>
+                        <button
+                          class="primary-button w-full"
+                          :disabled="balances[state.currentUserId] < item.price || isBusy"
+                          @click="handleRedeem(item.id)"
+                        >
+                          立即兌換
+                        </button>
                       </div>
                     </div>
                   </article>
@@ -1356,8 +1801,9 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                             </div>
                           </div>
                           <div class="flex flex-wrap gap-2">
-                            <button class="ghost-button" @click="updateRedemptionStatus(entry.id, 'in_progress')">待履行</button>
-                            <button class="primary-button" @click="updateRedemptionStatus(entry.id, 'fulfilled')">標記完成</button>
+                            <button class="ghost-button" @click="handleCancelRedemption(entry.id)">取消</button>
+                            <button class="ghost-button" @click="handleUpdateRedemptionStatus(entry.id, 'in_progress')">待履行</button>
+                            <button class="primary-button" @click="handleUpdateRedemptionStatus(entry.id, 'fulfilled')">標記完成</button>
                           </div>
                         </div>
                       </article>
@@ -1384,7 +1830,12 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                               <p class="mt-1 text-sm text-ink/60">{{ entry.note || '沒有補充說明。' }}</p>
                             </div>
                           </div>
-                          <p class="text-sm text-gold">{{ currency(entry.priceSnapshot) }}</p>
+                          <div class="flex flex-col items-end gap-2">
+                            <p class="text-sm text-gold">{{ currency(entry.priceSnapshot) }}</p>
+                            <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50" @click="handleCancelRedemption(entry.id)">
+                              取消兌換
+                            </button>
+                          </div>
                         </div>
                       </article>
                     </div>
@@ -1462,10 +1913,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </label>
                       <label class="field">
                         <span>相簿 (可選)</span>
-                        <input type="file" accept="image/*" @change="handleWishImageChange" />
+                        <input ref="wishImageInput" type="file" accept="image/*" @change="handleWishImageChange" />
                       </label>
-                      <div v-if="wishImagePreview" class="mt-2">
-                        <img :src="wishImagePreview" class="h-40 w-full rounded-[18px] object-cover" alt="願望圖片" />
+                      <div v-if="wishImagePreview" class="transparent-preview mt-2 rounded-[18px] p-2">
+                        <img :src="wishImagePreview" class="h-40 w-full rounded-[14px] object-contain" alt="願望圖片" />
+                        <div class="mt-2 flex justify-end">
+                          <button class="ghost-button !py-1.5 text-xs" @click="removeWishImage">移除圖片</button>
+                        </div>
                       </div>
                       <div class="flex justify-end">
                         <button class="primary-button" @click="handleAddWish">放入許願池 ♥</button>
@@ -1570,10 +2024,13 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                   <div class="grid gap-4 sm:grid-cols-2">
                     <label class="field">
                       <span>商品照片 (可選)</span>
-                      <input type="file" accept="image/*" @change="handleShopImageChange" />
+                      <input ref="shopImageInput" type="file" accept="image/*" @change="handleShopImageChange" />
                     </label>
-                    <div v-if="shopImagePreview" class="flex items-center justify-center rounded-[20px] bg-white/40 p-2">
-                      <img :src="shopImagePreview" class="h-24 w-full rounded-[16px] object-cover" alt="預覽" />
+                    <div v-if="shopImagePreview" class="transparent-preview rounded-[20px] p-2">
+                      <img :src="shopImagePreview" class="h-24 w-full rounded-[16px] object-contain" alt="預覽" />
+                      <div class="mt-2 flex justify-end">
+                        <button class="ghost-button !py-1.5 text-xs" @click="removeShopImage">移除圖片</button>
+                      </div>
                     </div>
                   </div>
 
@@ -1679,8 +2136,15 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <PersonChip :profile="profileMap.self" size="md" />
                       <div class="field">
                         <span>頭像</span>
-                        <input type="file" accept="image/*" @change="handleAvatarChange('self', $event)" />
+                        <input ref="avatarInput" type="file" accept="image/*" @change="handleAvatarChange('self', $event)" />
                       </div>
+                      <button
+                        v-if="profileMap.self.avatarUrl"
+                        class="ghost-button w-fit !py-1.5 text-red-500/70 hover:!bg-red-50"
+                        @click="removeAvatar"
+                      >
+                        移除頭像
+                      </button>
                       <label class="field">
                         <span>暱稱</span>
                         <input v-model="selfDraft.nickname" type="text" />
@@ -1864,5 +2328,16 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
     :variant="confirmModal.variant"
     @confirm="confirmModal.onConfirm"
     @cancel="confirmModal.show = false"
+  />
+
+  <ConfirmModal
+    :show="noticeModal.show"
+    :title="noticeModal.title"
+    :message="noticeModal.message"
+    :confirm-text="noticeModal.confirmText"
+    :variant="noticeModal.variant"
+    hide-cancel
+    @confirm="noticeModal.show = false"
+    @cancel="noticeModal.show = false"
   />
 </template>

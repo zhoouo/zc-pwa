@@ -7,6 +7,7 @@ defineProps<{
   message: string
   confirmText?: string
   cancelText?: string
+  hideCancel?: boolean
   variant?: 'danger' | 'primary'
 }>()
 
@@ -42,6 +43,7 @@ const emit = defineEmits(['confirm', 'cancel'])
             {{ confirmText || '確定' }}
           </button>
           <button 
+            v-if="!hideCancel"
             class="ghost-button w-full justify-center !py-3 !text-base"
             @click="emit('cancel')"
           >

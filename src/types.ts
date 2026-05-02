@@ -3,7 +3,7 @@ export type DensityMode = 'airy' | 'compact'
 export type MotionMode = 'soft' | 'still'
 export type GlassMode = 'luminous' | 'muted'
 
-export type TaskStatus = 'open' | 'submitted' | 'approved' | 'rejected' | 'cancelled'
+export type TaskStatus = 'open' | 'accepted' | 'submitted' | 'approved' | 'rejected' | 'cancelled'
 export type EntryType = 'task_reward' | 'shop_redeem' | 'manual_adjustment'
 export type SourceType = 'task' | 'redemption' | 'manual'
 export type RedemptionStatus = 'redeemed' | 'in_progress' | 'fulfilled' | 'cancelled'
@@ -12,7 +12,7 @@ export interface Profile {
   id: UserId
   realId?: string
   name: string
-  title: string
+  title?: string
   avatarUrl?: null | string
   avatarTone: string
 }
@@ -31,6 +31,7 @@ export interface Task {
   submittedAt?: string
   approvedAt?: string
   rejectionNote?: string
+  isRecurring: boolean
 }
 
 export interface LedgerEntry {
@@ -53,6 +54,7 @@ export interface ShopItem {
   creatorId: UserId
   isActive: boolean
   isHidden: boolean
+  imageUrl?: string | null
   createdAt: string
 }
 
@@ -71,8 +73,6 @@ export interface Redemption {
 export interface SetupForm {
   selfName: string
   partnerName: string
-  selfTitle: string
-  partnerTitle: string
 }
 
 export interface AppearanceSettings {
@@ -83,12 +83,13 @@ export interface AppearanceSettings {
 
 export interface BindingInfo {
   inviteCode: string
-  status: 'demo' | 'paired' | 'pending'
+  status: 'demo' | 'idle' | 'paired' | 'pending'
 }
 
 export interface AppState {
+  isInitializing: boolean
   isSetupComplete: boolean
-  coupleId?: string
+  coupleId?: null | string
   currentUserId: UserId
   profiles: Profile[]
   tasks: Task[]

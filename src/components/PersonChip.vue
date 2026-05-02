@@ -6,7 +6,7 @@ import type { Profile } from '../types'
 const props = withDefaults(
   defineProps<{
     profile: Profile
-    size?: 'sm' | 'md'
+    size?: 'xs' | 'sm' | 'md'
     subtitle?: string
   }>(),
   {
@@ -19,9 +19,11 @@ const initials = computed(() => props.profile.name.trim().slice(0, 1) || '你')
 const avatarClasses = computed(() =>
   props.size === 'md'
     ? 'h-11 w-11 text-sm'
-    : 'h-8 w-8 text-[11px]'
+    : props.size === 'xs'
+      ? 'h-6 w-6 text-[10px]'
+      : 'h-8 w-8 text-[11px]'
 )
-const nameClasses = computed(() => (props.size === 'md' ? 'text-sm' : 'text-xs'))
+const nameClasses = computed(() => (props.size === 'md' ? 'text-sm' : props.size === 'xs' ? 'text-[11px]' : 'text-xs'))
 </script>
 
 <template>

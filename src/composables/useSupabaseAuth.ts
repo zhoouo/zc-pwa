@@ -4,9 +4,9 @@ import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseEnabled, supabase } from '../lib/supabase'
 
 type UserMetadata = {
-  avatar_url?: string
-  nickname?: string
-  title?: string
+  avatar_url?: null | string
+  nickname?: null | string
+  title?: null | string
 }
 
 const loading = ref(true)
@@ -106,17 +106,61 @@ export const useSupabaseAuth = () => {
     return { error: '' }
   }
 
-  const uploadAvatar = async (file: File) => {
+  const compressImage = (file: File, maxWidth = 1024, quality = 0.8): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (event) => {
+        const img = new Image()
+        img.src = event.target?.result as string
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+
+          if (width > maxWidth) {
+            height = (maxWidth / width) * height
+            width = maxWidth
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+
+          const keepsTransparency = file.type === 'image/png' || file.type === 'image/webp'
+          const outputType = keepsTransparency ? file.type : 'image/jpeg'
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) resolve(blob)
+              else reject(new Error('Canvas to Blob failed'))
+            },
+            outputType,
+            quality
+          )
+        }
+        img.onerror = (err) => reject(err)
+      }
+      reader.onerror = (err) => reject(err)
+    })
+  }
+
+  const uploadFile = async (bucket: string, file: File | Blob, originalName?: string) => {
     if (!supabase || !user.value) {
-      return { error: '尚未設定 Supabase。' }
+      return { error: '尚未設定 Supabase 或未登入。' }
     }
 
-    const extension = file.name.split('.').pop() || 'png'
-    const path = `${user.value.id}/avatar.${extension}`
+    const blobType = file.type || 'image/jpeg'
+    const fallbackExtension =
+      blobType === 'image/png' ? 'png' : blobType === 'image/webp' ? 'webp' : 'jpg'
+    const extension = originalName?.split('.').pop() || fallbackExtension
+    const fileName = `${Date.now()}.${extension}`
+    const path = `${user.value.id}/${fileName}`
 
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(path, file, {
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
       cacheControl: '3600',
-      contentType: file.type,
+      contentType: blobType,
       upsert: true
     })
 
@@ -125,8 +169,63 @@ export const useSupabaseAuth = () => {
       return { error: uploadError.message }
     }
 
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-    return updateMetadata({ avatar_url: data.publicUrl })
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+    return { error: '', url: data.publicUrl }
+  }
+
+  const uploadAvatar = async (file: File) => {
+    try {
+      const compressed = await compressImage(file, 400, 0.7)
+      const result = await uploadFile('avatars', compressed, file.name)
+      if (result.error) return { error: result.error }
+      return updateMetadata({ avatar_url: result.url })
+    } catch (err: any) {
+      return { error: err.message || '頭像處理失敗' }
+    }
+  }
+
+  const deleteFile = async (bucket: string, url: string) => {
+    if (!supabase || !url) return
+    
+    const searchStr = `/public/${bucket}/`
+    const index = url.indexOf(searchStr)
+    if (index === -1) return
+    
+    const path = url.substring(index + searchStr.length)
+    await supabase.storage.from(bucket).remove([path])
+  }
+
+  const deleteUserFolder = async (bucket: string, userId: string) => {
+    if (!supabase) return
+    
+    const { data, error } = await supabase.storage.from(bucket).list(userId)
+    if (error || !data || data.length === 0) return
+    
+    const paths = data.map((f) => `${userId}/${f.name}`)
+    await supabase.storage.from(bucket).remove(paths)
+  }
+
+  const deleteAccount = async () => {
+    if (!supabase || !user.value) {
+      return { error: '尚未設定 Supabase 或未登入。' }
+    }
+
+    const userId = user.value.id
+    
+    // 1. 先清空存儲桶中的個人檔案
+    try {
+      await deleteUserFolder('avatars', userId)
+      await deleteUserFolder('shop', userId)
+    } catch (err) {
+      console.error('Storage cleanup failed:', err)
+    }
+
+    // 2. 刪除資料庫帳號
+    const { error } = await supabase.rpc('delete_account')
+    if (error) return { error: error.message }
+    
+    await signOut()
+    return { error: '' }
   }
 
   return {
@@ -141,6 +240,11 @@ export const useSupabaseAuth = () => {
     signUp,
     updateMetadata,
     uploadAvatar,
+    uploadFile,
+    deleteFile,
+    deleteUserFolder,
+    compressImage,
+    deleteAccount,
     user
   }
 }

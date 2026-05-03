@@ -627,9 +627,9 @@ const handleCreateTask = () => {
 }
 
 const taskSubmitRatings = reactive({
-  time: 3,
-  difficulty: 3,
-  avoidance: 3
+  time: 0,
+  difficulty: 0,
+  avoidance: 0
 })
 
 const taskSubmitPreview = computed(() => {
@@ -682,9 +682,6 @@ const handleAcceptTask = (task: Task) => {
 }
 
 const handleSubmitTask = (task: Task) => {
-  taskSubmitRatings.time = 3
-  taskSubmitRatings.difficulty = 3
-  taskSubmitRatings.avoidance = 3
   isSubmitConfirmWithRatings.value = true
   openConfirm({
     title: '送出批准',
@@ -2535,7 +2532,11 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
               class="rounded-md p-1 transition hover:bg-gold/10"
               @click="setStarRating('time', n)"
             >
-              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.time ? 'text-gold' : 'text-ink/20'" />
+              <Star
+                class="h-5 w-5"
+                :class="n <= taskSubmitRatings.time ? 'text-gold' : 'text-ink/20'"
+                :fill="n <= taskSubmitRatings.time ? 'currentColor' : 'none'"
+              />
             </button>
           </div>
         </div>
@@ -2550,7 +2551,11 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
               class="rounded-md p-1 transition hover:bg-gold/10"
               @click="setStarRating('difficulty', n)"
             >
-              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.difficulty ? 'text-gold' : 'text-ink/20'" />
+              <Star
+                class="h-5 w-5"
+                :class="n <= taskSubmitRatings.difficulty ? 'text-gold' : 'text-ink/20'"
+                :fill="n <= taskSubmitRatings.difficulty ? 'currentColor' : 'none'"
+              />
             </button>
           </div>
         </div>
@@ -2565,15 +2570,14 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
               class="rounded-md p-1 transition hover:bg-gold/10"
               @click="setStarRating('avoidance', n)"
             >
-              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.avoidance ? 'text-gold' : 'text-ink/20'" />
+              <Star
+                class="h-5 w-5"
+                :class="n <= taskSubmitRatings.avoidance ? 'text-gold' : 'text-ink/20'"
+                :fill="n <= taskSubmitRatings.avoidance ? 'currentColor' : 'none'"
+              />
             </button>
           </div>
         </div>
-      </div>
-
-      <div class="rounded-[20px] border border-gold/20 bg-gold/8 px-4 py-3 text-sm text-ink/70">
-        <p>倍率：{{ taskSubmitPreview.multiplier.toFixed(2) }}x（範圍 3x～5x）</p>
-        <p class="mt-1">預估獎勵：<span class="text-gold">{{ taskSubmitPreview.reward }}</span> 枚（基準 15 枚，無條件進位）</p>
       </div>
     </div>
   </ConfirmModal>

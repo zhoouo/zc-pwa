@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   LogOut,
   Plus,
+  Star,
   ScrollText,
   Settings2,
   Sparkles,
@@ -192,7 +193,6 @@ const setupForm = reactive({
 const taskForm = reactive({
   title: '',
   description: '',
-  coinReward: 30,
   dueAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
   isRecurring: false
 })
@@ -304,8 +304,7 @@ const outgoingRedemptions = computed(() =>
 
 const isTaskFormValid = computed(() =>
   Boolean(taskForm.title.trim()) &&
-  Number.isFinite(taskForm.coinReward) &&
-  taskForm.coinReward >= 0
+  true
 )
 
 const isTaskEditValid = computed(() =>
@@ -594,7 +593,6 @@ const handleGenerateInvite = async () => {
 const resetTaskForm = () => {
   taskForm.title = ''
   taskForm.description = ''
-  taskForm.coinReward = 30
   taskForm.dueAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
   taskForm.isRecurring = false
 }
@@ -620,17 +618,34 @@ const handleCreateTask = () => {
     return
   }
 
-  if (taskForm.coinReward < 0) {
-    pushNotify('金幣不能為負數。', 'info')
-    return
-  }
-
   openConfirm({
     title: '送出任務',
     message: `確定要把「${taskForm.title.trim()}」發給 ${profileMap.value.partner.name} 嗎？對方接取後才能送出批准。`,
     confirmText: '送出任務',
     onConfirm: createTaskNow
   })
+}
+
+const taskSubmitRatings = reactive({
+  time: 3,
+  difficulty: 3,
+  avoidance: 3
+})
+
+const taskSubmitPreview = computed(() => {
+  const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
+  const t = clamp(taskSubmitRatings.time)
+  const d = clamp(taskSubmitRatings.difficulty)
+  const a = clamp(taskSubmitRatings.avoidance)
+  const avg = (t + d + a) / 3
+  const multiplier = 3 + ((avg - 1) / 4) * (5 - 3)
+  const reward = Math.ceil(15 * multiplier)
+  return { t, d, a, multiplier, reward }
+})
+
+const isSubmitConfirmWithRatings = ref(false)
+const setStarRating = (key: 'time' | 'difficulty' | 'avoidance', value: number) => {
+  taskSubmitRatings[key] = Math.min(5, Math.max(1, Math.round(value)))
 }
 
 const handleShopImageChange = async (event: Event) => {
@@ -667,13 +682,22 @@ const handleAcceptTask = (task: Task) => {
 }
 
 const handleSubmitTask = (task: Task) => {
+  taskSubmitRatings.time = 3
+  taskSubmitRatings.difficulty = 3
+  taskSubmitRatings.avoidance = 3
+  isSubmitConfirmWithRatings.value = true
   openConfirm({
     title: '送出批准',
     message: `確定要把「${task.title}」送給 ${personById(task.creatorId).name} 批准嗎？`,
     confirmText: '送出批准',
     onConfirm: async () => {
+      isSubmitConfirmWithRatings.value = false
       isBusy.value = true
-      const result = await submitTask(task.id)
+      const result = await submitTask(task.id, {
+        time: taskSubmitRatings.time,
+        difficulty: taskSubmitRatings.difficulty,
+        avoidance: taskSubmitRatings.avoidance
+      })
       isBusy.value = false
       if (result.error) {
         pushNotify(`送出失敗：${result.error}`, 'error')
@@ -1804,10 +1828,11 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     <textarea v-model="taskForm.description" rows="3" placeholder="寫得短一點也可以，只要讓對方明白就好。" />
                   </label>
                   <div class="grid gap-4 sm:grid-cols-2">
-                    <label class="field">
-                      <span>金幣</span>
-                      <input v-model.number="taskForm.coinReward" type="number" min="0" />
-                    </label>
+                    <div class="soft-card rounded-[24px] px-4 py-4 text-sm text-ink/55">
+                      <p class="font-serif text-ink/80">基準金幣</p>
+                      <p class="mt-1 text-2xl text-gold">15 枚</p>
+                      <p class="mt-2 text-xs text-ink/45">最終金幣會在對方「送出批准」時依評分倍率計算。</p>
+                    </div>
                     <label class="field">
                       <span>截止日</span>
                       <DatePicker v-model="taskForm.dueAt" />
@@ -1827,8 +1852,6 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       />
                     </button>
                   </label>
-                  <p v-if="taskForm.coinReward < 0" class="text-sm text-red-500/80">金幣不能為負數。</p>
-
                   <div class="mt-2 flex justify-end">
                     <button class="primary-button" :disabled="!isTaskFormValid || isBusy" @click="handleCreateTask">去吧 !我的任務</button>
                   </div>
@@ -2493,8 +2516,67 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
     :confirm-text="confirmModal.confirmText"
     :variant="confirmModal.variant"
     @confirm="confirmModal.onConfirm"
-    @cancel="confirmModal.show = false"
-  />
+    @cancel="confirmModal.show = false; isSubmitConfirmWithRatings = false"
+  >
+    <div v-if="isSubmitConfirmWithRatings" class="space-y-4">
+      <div class="rounded-[20px] border border-white/40 bg-white/55 px-4 py-4">
+        <p class="text-sm text-ink/70">請為這次任務打分（1～5）</p>
+        <p class="mt-1 text-xs text-ink/45">這會決定最後拿到的金幣。</p>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm text-ink/70">時間（精力成本）</p>
+          <div class="flex items-center gap-1">
+            <button
+              v-for="n in 5"
+              :key="`t-${n}`"
+              type="button"
+              class="rounded-md p-1 transition hover:bg-gold/10"
+              @click="setStarRating('time', n)"
+            >
+              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.time ? 'text-gold' : 'text-ink/20'" />
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm text-ink/70">難度（用腦程度）</p>
+          <div class="flex items-center gap-1">
+            <button
+              v-for="n in 5"
+              :key="`d-${n}`"
+              type="button"
+              class="rounded-md p-1 transition hover:bg-gold/10"
+              @click="setStarRating('difficulty', n)"
+            >
+              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.difficulty ? 'text-gold' : 'text-ink/20'" />
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm text-ink/70">不想做程度</p>
+          <div class="flex items-center gap-1">
+            <button
+              v-for="n in 5"
+              :key="`a-${n}`"
+              type="button"
+              class="rounded-md p-1 transition hover:bg-gold/10"
+              @click="setStarRating('avoidance', n)"
+            >
+              <Star class="h-5 w-5" :class="n <= taskSubmitRatings.avoidance ? 'text-gold' : 'text-ink/20'" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-[20px] border border-gold/20 bg-gold/8 px-4 py-3 text-sm text-ink/70">
+        <p>倍率：{{ taskSubmitPreview.multiplier.toFixed(2) }}x（範圍 3x～5x）</p>
+        <p class="mt-1">預估獎勵：<span class="text-gold">{{ taskSubmitPreview.reward }}</span> 枚（基準 15 枚，無條件進位）</p>
+      </div>
+    </div>
+  </ConfirmModal>
 
   <ConfirmModal
     :show="noticeModal.show"

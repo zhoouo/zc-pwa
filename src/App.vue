@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import {
   CheckCheck,
   Cloud,
@@ -34,6 +34,7 @@ import type {
   GlassMode,
   MotionMode,
   Profile,
+  ShopItem,
   Task,
   UserId
 } from './types'
@@ -71,6 +72,7 @@ const {
   approveTask,
   clearCompletedTask,
   createShopItem,
+  updateShopItem,
   toggleItemVisibility,
   deleteShopItem,
   redeemItem,
@@ -214,6 +216,8 @@ const shopForm = reactive({
 })
 const shopImagePreview = ref<string | null>(null)
 const currentWishId = ref<string | null>(null)
+const editingShopItemId = ref<string | null>(null)
+let skipShopNewTabReset = false
 
 const wishForm = reactive({
   title: '',
@@ -368,6 +372,26 @@ const switchShopView = (subView: ShopSubView) => {
   shopSubView.value = subView
 }
 
+const resetShopNewForm = () => {
+  editingShopItemId.value = null
+  currentWishId.value = null
+  shopForm.title = ''
+  shopForm.description = ''
+  shopForm.price = 120
+  shopForm.category = '日常'
+  shopForm.isHidden = false
+  shopForm.rawFile = null
+  shopForm.imageUrl = ''
+  shopImagePreview.value = null
+  if (shopImageInput.value) shopImageInput.value.value = ''
+}
+
+watch(shopSubView, (v) => {
+  if (v !== 'new') return
+  if (skipShopNewTabReset) return
+  resetShopNewForm()
+})
+
 const appShellClasses = computed(() => [
   state.appearance.density === 'compact' ? 'density-compact' : 'density-airy',
   state.appearance.motion === 'still' ? 'motion-still' : 'motion-soft',
@@ -493,15 +517,47 @@ const handleDeleteShopItem = (itemId: string, skipStorage = false) => {
 }
 
 const handleGrantWish = (item: any) => {
+  skipShopNewTabReset = true
+  editingShopItemId.value = null
   shopForm.title = item.title
   shopForm.description = item.description
   shopForm.category = '願望實現'
   shopForm.price = 120
+  shopForm.rawFile = null
   shopForm.imageUrl = item.imageUrl || ''
   shopImagePreview.value = item.imageUrl || null
+  if (shopImageInput.value) shopImageInput.value.value = ''
   currentWishId.value = item.id
   shopSubView.value = 'new'
+  void nextTick(() => {
+    skipShopNewTabReset = false
+  })
   pushNotify('已將願望填入表單，請設定價格與分類後上架。', 'info')
+}
+
+const handleEditShopItem = (item: ShopItem) => {
+  skipShopNewTabReset = true
+  currentWishId.value = null
+  editingShopItemId.value = item.id
+  shopForm.title = item.title
+  shopForm.description = item.description
+  shopForm.price = item.price
+  shopForm.category = item.category || '日常'
+  shopForm.isHidden = item.isHidden
+  shopForm.rawFile = null
+  shopForm.imageUrl = item.imageUrl || ''
+  shopImagePreview.value = item.imageUrl || null
+  if (shopImageInput.value) shopImageInput.value.value = ''
+  shopSubView.value = 'new'
+  void nextTick(() => {
+    skipShopNewTabReset = false
+  })
+  pushNotify('已載入項目，修改後按儲存即可更新。', 'info')
+}
+
+const cancelShopDraft = () => {
+  resetShopNewForm()
+  shopSubView.value = 'mine'
 }
 
 const handleGenerateInvite = async () => {
@@ -731,6 +787,13 @@ const handleCreateShopItem = async () => {
     return
   }
 
+  if (!Number.isFinite(shopForm.price) || shopForm.price < 0) {
+    pushNotify('價格必須是 0 以上的數字。', 'info')
+    return
+  }
+
+  const editingId = editingShopItemId.value
+
   isBusy.value = true
   let finalImageUrl = ''
 
@@ -750,32 +813,57 @@ const handleCreateShopItem = async () => {
         finalImageUrl = uploadResult.url || ''
       }
     }
-    const { error } = await createShopItem({
-      title: shopForm.title.trim(),
-      description: shopForm.description.trim(),
-      price: shopForm.price,
-      category: shopForm.category.trim(),
-      isHidden: shopForm.isHidden,
-      imageUrl: finalImageUrl || shopForm.imageUrl || null
-    })
 
-    if (!error && currentWishId.value) {
-      // 成功上架後，刪除原本的願望（跳過圖片刪除，因為新項目正在使用它）
-      await deleteShopItem(currentWishId.value, true)
-      currentWishId.value = null
-    }
+    const imagePayload = finalImageUrl || shopForm.imageUrl || null
 
-    if (error) {
-      pushNotify(`建立失敗：${error.message}`, 'error')
+    if (editingId) {
+      const { error } = await updateShopItem(editingId, {
+        title: shopForm.title.trim(),
+        description: shopForm.description.trim(),
+        price: shopForm.price,
+        category: shopForm.category.trim(),
+        isHidden: shopForm.isHidden,
+        imageUrl: imagePayload
+      })
+
+      if (error) {
+        pushNotify(`更新失敗：${error.message}`, 'error')
+      } else {
+        resetShopNewForm()
+        shopSubView.value = 'mine'
+        pushNotify('項目已更新。', 'success')
+      }
     } else {
-      shopForm.title = ''
-      shopForm.description = ''
-      shopForm.price = 120
-      shopForm.category = '日常'
-      shopForm.isHidden = false
-      removeShopImage()
-      shopSubView.value = 'mine'
-      pushNotify('願望已實現並成功上架！', 'success')
+      const pendingWishId = currentWishId.value
+
+      const { error } = await createShopItem({
+        title: shopForm.title.trim(),
+        description: shopForm.description.trim(),
+        price: shopForm.price,
+        category: shopForm.category.trim(),
+        isHidden: shopForm.isHidden,
+        imageUrl: imagePayload
+      })
+
+      if (!error && pendingWishId) {
+        // 成功上架後，刪除原本的願望（跳過圖片刪除，因為新項目正在使用它）
+        await deleteShopItem(pendingWishId, true)
+        currentWishId.value = null
+      }
+
+      if (error) {
+        pushNotify(`建立失敗：${error.message}`, 'error')
+      } else {
+        shopForm.title = ''
+        shopForm.description = ''
+        shopForm.price = 120
+        shopForm.category = '日常'
+        shopForm.isHidden = false
+        removeShopImage()
+        editingShopItemId.value = null
+        shopSubView.value = 'mine'
+        pushNotify(pendingWishId ? '願望已實現並成功上架！' : '項目已上架。', 'success')
+      }
     }
   } catch (err: any) {
     pushNotify(`處理失敗：${err.message}`, 'error')
@@ -1874,6 +1962,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <button class="ghost-button !py-1.5" @click="toggleItemVisibility(item.id)">
                           {{ item.isActive ? '暫停上架' : '重新上架' }}
                         </button>
+                        <button class="ghost-button !py-1.5" @click="handleEditShopItem(item)">編輯</button>
                         <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50" @click="handleDeleteShopItem(item.id)">
                           刪除
                         </button>
@@ -1988,6 +2077,8 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                 </div>
 
                 <div v-else class="grid gap-4">
+                  <p v-if="editingShopItemId" class="text-sm text-ink/55">編輯模式：修改後按下「儲存變更」即可更新。</p>
+                  <p v-else class="text-sm text-ink/55">建立新的商城項目（或從願望上架）。</p>
                   <label class="field">
                     <span>名稱</span>
                     <input v-model="shopForm.title" type="text" placeholder="例如：看電影" />
@@ -1999,7 +2090,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                   <div class="grid gap-4 sm:grid-cols-3">
                     <label class="field">
                       <span>價格</span>
-                      <input v-model.number="shopForm.price" type="number" min="1" />
+                      <input v-model.number="shopForm.price" type="number" min="0" />
                     </label>
                     <label class="field">
                       <span>分類</span>
@@ -2034,8 +2125,19 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     </div>
                   </div>
 
-                  <div class="mt-2 flex justify-end">
-                    <button class="primary-button" @click="handleCreateShopItem">新增項目</button>
+                  <div class="mt-2 flex flex-wrap justify-end gap-2">
+                    <button
+                      v-if="editingShopItemId || currentWishId"
+                      type="button"
+                      class="ghost-button"
+                      :disabled="isBusy"
+                      @click="cancelShopDraft"
+                    >
+                      取消
+                    </button>
+                    <button class="primary-button" :disabled="isBusy" @click="handleCreateShopItem">
+                      {{ editingShopItemId ? '儲存變更' : '新增項目' }}
+                    </button>
                   </div>
                 </div>
               </article>

@@ -108,6 +108,15 @@ const byLatestActivity = (a: Task, b: Task) => {
   return bTime - aTime
 }
 
+const removeHostedShopImage = async (imageUrl: string | null | undefined) => {
+  if (!supabase || !imageUrl) return
+  const searchStr = '/public/shop/'
+  const index = imageUrl.indexOf(searchStr)
+  if (index === -1) return
+  const path = imageUrl.substring(index + searchStr.length)
+  await supabase.storage.from('shop').remove([path])
+}
+
 export const useCoupleApp = () => {
   const currentUser = computed(() => state.profiles.find((profile) => profile.id === state.currentUserId)!)
   const partnerUser = computed(() => state.profiles.find((profile) => profile.id !== state.currentUserId)!)
@@ -686,6 +695,44 @@ export const useCoupleApp = () => {
     return { error }
   }
 
+  const updateShopItem = async (
+    itemId: string,
+    payload: {
+      title: string
+      description: string
+      price: number
+      category: string
+      isHidden: boolean
+      imageUrl?: string | null
+    }
+  ) => {
+    if (!supabase || !state.coupleId) return { error: { message: '未連線' } }
+
+    const item = state.shopItems.find((entry) => entry.id === itemId)
+    if (!item) return { error: { message: '商品不存在' } }
+    if (item.creatorId !== state.currentUserId) return { error: { message: '只能編輯自己的項目' } }
+
+    const nextUrl = payload.imageUrl?.trim() ? payload.imageUrl.trim() : null
+    const prevUrl = item.imageUrl || null
+
+    const { error } = await supabase
+      .from('shop_items')
+      .update({
+        title: payload.title.trim(),
+        description: payload.description.trim(),
+        price: payload.price,
+        category: payload.category.trim() || '未分類',
+        is_hidden: payload.isHidden,
+        image_url: nextUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', itemId)
+
+    if (!error && prevUrl && prevUrl !== nextUrl) await removeHostedShopImage(prevUrl)
+    if (!error) await fetchData(true)
+    return { error }
+  }
+
   const toggleItemVisibility = async (itemId: string) => {
     if (!supabase) return
     const item = state.shopItems.find((entry) => entry.id === itemId)
@@ -820,14 +867,7 @@ export const useCoupleApp = () => {
 
     state.shopItems = state.shopItems.filter((item) => item.id !== itemId)
 
-    if (!skipStorage && itemToDelete?.imageUrl) {
-      const searchStr = '/public/shop/'
-      const index = itemToDelete.imageUrl.indexOf(searchStr)
-      if (index !== -1) {
-        const path = itemToDelete.imageUrl.substring(index + searchStr.length)
-        await supabase.storage.from('shop').remove([path])
-      }
-    }
+    if (!skipStorage && itemToDelete?.imageUrl) await removeHostedShopImage(itemToDelete.imageUrl)
 
     const { error } = await supabase.from('shop_items').delete().eq('id', itemId)
     if (error) {
@@ -901,6 +941,7 @@ export const useCoupleApp = () => {
     approveTask,
     clearCompletedTask,
     createShopItem,
+    updateShopItem,
     toggleItemVisibility,
     deleteShopItem,
     redeemItem,

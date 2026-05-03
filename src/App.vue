@@ -632,16 +632,9 @@ const taskSubmitRatings = reactive({
   avoidance: 0
 })
 
-const taskSubmitPreview = computed(() => {
-  const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
-  const t = clamp(taskSubmitRatings.time)
-  const d = clamp(taskSubmitRatings.difficulty)
-  const a = clamp(taskSubmitRatings.avoidance)
-  const avg = (t + d + a) / 3
-  const multiplier = 3 + ((avg - 1) / 4) * (5 - 3)
-  const reward = Math.ceil(15 * multiplier)
-  return { t, d, a, multiplier, reward }
-})
+const isSubmitRatingsComplete = computed(
+  () => taskSubmitRatings.time > 0 && taskSubmitRatings.difficulty > 0 && taskSubmitRatings.avoidance > 0
+)
 
 const isSubmitConfirmWithRatings = ref(false)
 const setStarRating = (key: 'time' | 'difficulty' | 'avoidance', value: number) => {
@@ -682,6 +675,9 @@ const handleAcceptTask = (task: Task) => {
 }
 
 const handleSubmitTask = (task: Task) => {
+  taskSubmitRatings.time = 0
+  taskSubmitRatings.difficulty = 0
+  taskSubmitRatings.avoidance = 0
   isSubmitConfirmWithRatings.value = true
   openConfirm({
     title: '送出批准',
@@ -2512,13 +2508,14 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
     :message="confirmModal.message"
     :confirm-text="confirmModal.confirmText"
     :variant="confirmModal.variant"
+    :confirm-disabled="isSubmitConfirmWithRatings && !isSubmitRatingsComplete"
     @confirm="confirmModal.onConfirm"
     @cancel="confirmModal.show = false; isSubmitConfirmWithRatings = false"
   >
     <div v-if="isSubmitConfirmWithRatings" class="space-y-4">
       <div class="rounded-[20px] border border-white/40 bg-white/55 px-4 py-4">
         <p class="text-sm text-ink/70">請為這次任務打分（1～5）</p>
-        <p class="mt-1 text-xs text-ink/45">這會決定最後拿到的金幣。</p>
+        <p class="mt-1 text-xs text-ink/45">(～￣▽￣)～</p>
       </div>
 
       <div class="space-y-3">

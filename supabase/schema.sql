@@ -83,6 +83,8 @@
     title text not null,
     description text,
     price integer not null check (price >= 0),
+    is_product boolean not null default false,
+    real_price numeric,
     category text,
     is_active boolean not null default true,
     is_hidden boolean not null default false,

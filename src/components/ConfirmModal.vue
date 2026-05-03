@@ -34,6 +34,10 @@ const emit = defineEmits(['confirm', 'cancel'])
           <p class="mt-3 text-sm leading-6 text-ink/65">{{ message }}</p>
         </div>
 
+        <div v-if="$slots.default" class="mb-6">
+          <slot />
+        </div>
+
         <div class="flex flex-col gap-3">
           <button 
             class="primary-button w-full justify-center !py-3.5 !text-base shadow-lg"

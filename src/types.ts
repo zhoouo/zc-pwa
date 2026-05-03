@@ -50,6 +50,8 @@ export interface ShopItem {
   title: string
   description: string
   price: number
+  isProduct: boolean
+  realPrice?: number | null
   category: string
   creatorId: UserId
   isActive: boolean

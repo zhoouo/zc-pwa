@@ -49,14 +49,14 @@ const state = reactive<AppState>({
 
 let realtimeChannel: RealtimeChannel | null = null
 let realtimeCoupleId = ''
-let realtimePollInterval: ReturnType<typeof setInterval> | null = null
+let realtimePollInterval: number | null = null
 let visibilityListenerAttached = false
 
 const REALTIME_FALLBACK_POLL_MS = 22000
 
 const disposeCoupleRealtime = () => {
   if (realtimePollInterval !== null) {
-    clearInterval(realtimePollInterval)
+    window.clearInterval(realtimePollInterval)
     realtimePollInterval = null
   }
   if (supabase && realtimeChannel) {
@@ -325,6 +325,8 @@ export const useCoupleApp = () => {
       title: item.title,
       description: item.description || '',
       price: item.price,
+      isProduct: Boolean(item.is_product),
+      realPrice: item.real_price !== undefined ? item.real_price : null,
       category: item.category || '',
       creatorId: mapUser(item.creator_id),
       isActive: item.is_active,
@@ -711,6 +713,8 @@ export const useCoupleApp = () => {
     title: string
     description: string
     price: number
+    isProduct: boolean
+    realPrice?: number | null
     category: string
     isHidden: boolean
     imageUrl?: string | null
@@ -725,6 +729,8 @@ export const useCoupleApp = () => {
         title: payload.title.trim(),
         description: payload.description.trim(),
         price: payload.price,
+        is_product: payload.isProduct,
+        real_price: payload.isProduct ? payload.realPrice ?? null : null,
         category: payload.category.trim() || '未分類',
         is_hidden: payload.isHidden,
         is_active: true,
@@ -743,6 +749,8 @@ export const useCoupleApp = () => {
       title: string
       description: string
       price: number
+      isProduct: boolean
+      realPrice?: number | null
       category: string
       isHidden: boolean
       imageUrl?: string | null
@@ -763,6 +771,8 @@ export const useCoupleApp = () => {
         title: payload.title.trim(),
         description: payload.description.trim(),
         price: payload.price,
+        is_product: payload.isProduct,
+        real_price: payload.isProduct ? payload.realPrice ?? null : null,
         category: payload.category.trim() || '未分類',
         is_hidden: payload.isHidden,
         image_url: nextUrl,

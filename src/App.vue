@@ -109,8 +109,8 @@ const accountMode = ref<'signin' | 'signup'>('signin')
 const showPassword = ref(false)
 const hiddenTapCount = ref(0)
 const hiddenUnlocked = ref(false)
-const rejectionDraft = ref<Record<string, string>>({})
-const redemptionNote = ref<Record<string, string>>({})
+const rejectionDraft = reactive<Record<string, string>>({})
+const redemptionNote = reactive<Record<string, string>>({})
 const editingTaskId = ref<string | null>(null)
 const shopImageInput = ref<HTMLInputElement | null>(null)
 const wishImageInput = ref<HTMLInputElement | null>(null)
@@ -209,6 +209,8 @@ const shopForm = reactive({
   title: '',
   description: '',
   price: 120,
+  isProduct: false,
+  realPrice: 0,
   category: '日常',
   isHidden: false,
   rawFile: null as File | null,
@@ -218,6 +220,13 @@ const shopImagePreview = ref<string | null>(null)
 const currentWishId = ref<string | null>(null)
 const editingShopItemId = ref<string | null>(null)
 let skipShopNewTabReset = false
+
+const shopCoinQuote = computed(() => {
+  if (!shopForm.isProduct) return shopForm.price
+  const real = Number(shopForm.realPrice)
+  if (!Number.isFinite(real) || real < 0) return 0
+  return Math.max(0, Math.round(real * 15))
+})
 
 const wishForm = reactive({
   title: '',
@@ -378,6 +387,8 @@ const resetShopNewForm = () => {
   shopForm.title = ''
   shopForm.description = ''
   shopForm.price = 120
+  shopForm.isProduct = false
+  shopForm.realPrice = 0
   shopForm.category = '日常'
   shopForm.isHidden = false
   shopForm.rawFile = null
@@ -521,6 +532,8 @@ const handleGrantWish = (item: any) => {
   editingShopItemId.value = null
   shopForm.title = item.title
   shopForm.description = item.description
+  shopForm.isProduct = false
+  shopForm.realPrice = 0
   shopForm.category = '願望實現'
   shopForm.price = 120
   shopForm.rawFile = null
@@ -542,6 +555,13 @@ const handleEditShopItem = (item: ShopItem) => {
   shopForm.title = item.title
   shopForm.description = item.description
   shopForm.price = item.price
+  shopForm.isProduct = item.isProduct
+  shopForm.realPrice =
+    item.realPrice !== undefined && item.realPrice !== null
+      ? Number(item.realPrice)
+      : item.isProduct
+        ? Math.max(0, Math.round((item.price / 15) * 100) / 100)
+        : 0
   shopForm.category = item.category || '日常'
   shopForm.isHidden = item.isHidden
   shopForm.rawFile = null
@@ -787,9 +807,17 @@ const handleCreateShopItem = async () => {
     return
   }
 
-  if (!Number.isFinite(shopForm.price) || shopForm.price < 0) {
-    pushNotify('價格必須是 0 以上的數字。', 'info')
-    return
+  if (shopForm.isProduct) {
+    const real = Number(shopForm.realPrice)
+    if (!Number.isFinite(real) || real < 0) {
+      pushNotify('現實價格必須是 0 以上的數字。', 'info')
+      return
+    }
+  } else {
+    if (!Number.isFinite(shopForm.price) || shopForm.price < 0) {
+      pushNotify('價格必須是 0 以上的數字。', 'info')
+      return
+    }
   }
 
   const editingId = editingShopItemId.value
@@ -815,12 +843,15 @@ const handleCreateShopItem = async () => {
     }
 
     const imagePayload = finalImageUrl || shopForm.imageUrl || null
+    const finalPrice = shopForm.isProduct ? shopCoinQuote.value : shopForm.price
 
     if (editingId) {
       const { error } = await updateShopItem(editingId, {
         title: shopForm.title.trim(),
         description: shopForm.description.trim(),
-        price: shopForm.price,
+        price: finalPrice,
+        isProduct: shopForm.isProduct,
+        realPrice: shopForm.isProduct ? Number(shopForm.realPrice) : null,
         category: shopForm.category.trim(),
         isHidden: shopForm.isHidden,
         imageUrl: imagePayload
@@ -839,7 +870,9 @@ const handleCreateShopItem = async () => {
       const { error } = await createShopItem({
         title: shopForm.title.trim(),
         description: shopForm.description.trim(),
-        price: shopForm.price,
+        price: finalPrice,
+        isProduct: shopForm.isProduct,
+        realPrice: shopForm.isProduct ? Number(shopForm.realPrice) : null,
         category: shopForm.category.trim(),
         isHidden: shopForm.isHidden,
         imageUrl: imagePayload
@@ -890,14 +923,14 @@ const handleRedeem = (itemId: string) => {
     confirmText: '立即兌換',
     onConfirm: async () => {
       isBusy.value = true
-      const result = await redeemItem(itemId, redemptionNote.value[itemId] ?? '')
+      const result = await redeemItem(itemId, redemptionNote[itemId] ?? '')
       isBusy.value = false
       if (!result.ok) {
         pushNotify(result.reason, 'error')
         return
       }
 
-      redemptionNote.value[itemId] = ''
+      redemptionNote[itemId] = ''
       shopSubView.value = 'orders'
       openNotice({
         title: '兌換單已送出',
@@ -1021,6 +1054,8 @@ const handleAddWish = async () => {
       title: wishForm.title.trim(),
       description: wishForm.description.trim(),
       price: 0,
+      isProduct: false,
+      realPrice: null,
       category: '許願池',
       isHidden: false,
       imageUrl: finalImageUrl || null
@@ -1873,7 +1908,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     <div class="space-y-3">
                       <article v-for="entry in incomingRedemptions" :key="entry.id" class="soft-card rounded-[24px] px-4 py-4">
                         <div v-if="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl" class="mb-4">
-                          <img :src="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl" class="h-32 w-full rounded-[16px] object-cover" alt="項目圖片" />
+                          <img :src="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl || ''" class="h-32 w-full rounded-[16px] object-cover" alt="項目圖片" />
                         </div>
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div class="space-y-3">
@@ -1903,7 +1938,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     <div class="space-y-3">
                       <article v-for="entry in outgoingRedemptions" :key="entry.id" class="soft-card rounded-[24px] px-4 py-4">
                         <div v-if="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl" class="mb-4">
-                          <img :src="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl" class="h-32 w-full rounded-[16px] object-cover" alt="項目圖片" />
+                          <img :src="state.shopItems.find(i => i.id === entry.shopItemId)?.imageUrl || ''" class="h-32 w-full rounded-[16px] object-cover" alt="項目圖片" />
                         </div>
                         <div class="flex items-start justify-between gap-3">
                           <div class="space-y-3">
@@ -2087,10 +2122,34 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     <span>描述</span>
                     <textarea v-model="shopForm.description" rows="3" placeholder="說明一下這份禮物會怎麼實現。例如:我請你看電影(/≧▽≦)/" />
                   </label>
+
+                  <label class="field field-inline">
+                    <span>是否為商品</span>
+                    <button
+                      type="button"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                      :class="shopForm.isProduct ? 'bg-gold' : 'bg-ink/20'"
+                      @click="shopForm.isProduct = !shopForm.isProduct"
+                    >
+                      <span
+                        class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                        :class="shopForm.isProduct ? 'translate-x-6' : 'translate-x-1'"
+                      />
+                    </button>
+                  </label>
+
                   <div class="grid gap-4 sm:grid-cols-3">
-                    <label class="field">
-                      <span>價格</span>
+                    <label v-if="!shopForm.isProduct" class="field">
+                      <span>金幣</span>
                       <input v-model.number="shopForm.price" type="number" min="0" />
+                    </label>
+                    <label v-else class="field">
+                      <span>現實價格</span>
+                      <input v-model.number="shopForm.realPrice" type="number" min="0" step="0.01" />
+                    </label>
+                    <label v-if="shopForm.isProduct" class="field">
+                      <span>所需金幣（× 15）</span>
+                      <input :value="shopCoinQuote" type="number" disabled />
                     </label>
                     <label class="field">
                       <span>分類</span>

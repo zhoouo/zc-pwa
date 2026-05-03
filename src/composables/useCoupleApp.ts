@@ -138,12 +138,12 @@ export const useCoupleApp = () => {
     const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
     const t = clamp(ratings.time)
     const d = clamp(ratings.difficulty)
-    const a = clamp(ratings.avoidance)
+    const a = 6 - clamp(ratings.avoidance) // Reverse for preference: 5 stars = 1 point, 1 star = 5 points
     const avg = (t + d + a) / 3
 
     // 加權平均 + 封頂（此處三項等權重）
-    // M_min=3, M_max=5
-    const multiplier = 3 + ((avg - 1) / 4) * (5 - 3)
+    // M_min=3, M_max=10
+    const multiplier = 3 + ((avg - 1) / 4) * (10 - 3)
     const reward = Math.ceil(base * multiplier)
     return { reward, multiplier, ratings: { time: t, difficulty: d, avoidance: a } }
   }

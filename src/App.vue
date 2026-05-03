@@ -2149,7 +2149,12 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                     </label>
                     <label v-if="shopForm.isProduct" class="field">
                       <span>所需金幣（× 15）</span>
-                      <input :value="shopCoinQuote" type="number" disabled />
+                      <input
+                        :value="shopCoinQuote"
+                        type="number"
+                        disabled
+                        class="cursor-not-allowed !bg-black/5 !text-ink/55 opacity-85"
+                      />
                     </label>
                     <label class="field">
                       <span>分類</span>

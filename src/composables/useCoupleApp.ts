@@ -580,6 +580,10 @@ export const useCoupleApp = () => {
       description: payload.description.trim(),
       coin_reward: 15,
       reward_base: 15,
+      rating_time: null,
+      rating_difficulty: null,
+      rating_avoidance: null,
+      reward_multiplier: null,
       due_at: payload.dueAt || null,
       is_recurring: payload.isRecurring,
       status: 'open'
@@ -725,6 +729,11 @@ export const useCoupleApp = () => {
           submitted_at: null,
           approved_at: null,
           rejection_note: null,
+          rating_time: null,
+          rating_difficulty: null,
+          rating_avoidance: null,
+          reward_multiplier: null,
+          coin_reward: 0,
           updated_at: new Date().toISOString()
         })
         .eq('id', taskId)

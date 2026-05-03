@@ -2558,7 +2558,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
         </div>
 
         <div class="flex items-center justify-between gap-3">
-          <p class="text-sm text-ink/70">不想做程度</p>
+          <p class="text-sm text-ink/70">喜好程度</p>
           <div class="flex items-center gap-1">
             <button
               v-for="n in 5"

@@ -9,6 +9,7 @@ defineProps<{
   cancelText?: string
   hideCancel?: boolean
   variant?: 'danger' | 'primary'
+  confirmDisabled?: boolean
 }>()
 
 const emit = defineEmits(['confirm', 'cancel'])
@@ -40,8 +41,9 @@ const emit = defineEmits(['confirm', 'cancel'])
 
         <div class="flex flex-col gap-3">
           <button 
-            class="primary-button w-full justify-center !py-3.5 !text-base shadow-lg"
+            class="primary-button w-full justify-center !py-3.5 !text-base shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
             :class="{ '!bg-red-500 !border-red-500 !text-white': variant === 'danger' }"
+            :disabled="confirmDisabled"
             @click="emit('confirm')"
           >
             {{ confirmText || '確定' }}

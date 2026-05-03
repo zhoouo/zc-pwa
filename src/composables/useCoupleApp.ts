@@ -134,6 +134,20 @@ const removeHostedShopImage = async (imageUrl: string | null | undefined) => {
 }
 
 export const useCoupleApp = () => {
+  const computeTaskReward = (base: number, ratings: { time: number; difficulty: number; avoidance: number }) => {
+    const clamp = (v: number) => Math.min(5, Math.max(1, Math.round(v)))
+    const t = clamp(ratings.time)
+    const d = clamp(ratings.difficulty)
+    const a = clamp(ratings.avoidance)
+    const avg = (t + d + a) / 3
+
+    // 加權平均 + 封頂（此處三項等權重）
+    // M_min=3, M_max=5
+    const multiplier = 3 + ((avg - 1) / 4) * (5 - 3)
+    const reward = Math.ceil(base * multiplier)
+    return { reward, multiplier, ratings: { time: t, difficulty: d, avoidance: a } }
+  }
+
   const currentUser = computed(() => state.profiles.find((profile) => profile.id === state.currentUserId)!)
   const partnerUser = computed(() => state.profiles.find((profile) => profile.id !== state.currentUserId)!)
   const profileMap = computed(
@@ -552,13 +566,11 @@ export const useCoupleApp = () => {
   const createTask = async (payload: {
     title: string
     description: string
-    coinReward: number
     dueAt: string
     assigneeId: UserId
     isRecurring: boolean
   }) => {
     if (!supabase || !state.coupleId) return { error: '未連線' }
-    if (payload.coinReward < 0) return { error: '金幣不能為負數。' }
 
     const { error } = await supabase.from('tasks').insert({
       couple_id: state.coupleId,
@@ -566,7 +578,8 @@ export const useCoupleApp = () => {
       assignee_id: unmapUser(payload.assigneeId),
       title: payload.title.trim(),
       description: payload.description.trim(),
-      coin_reward: payload.coinReward,
+      coin_reward: 15,
+      reward_base: 15,
       due_at: payload.dueAt || null,
       is_recurring: payload.isRecurring,
       status: 'open'
@@ -623,12 +636,26 @@ export const useCoupleApp = () => {
     return { error: error?.message || null }
   }
 
-  const submitTask = async (taskId: string) => {
+  const submitTask = async (
+    taskId: string,
+    ratings: { time: number; difficulty: number; avoidance: number }
+  ) => {
     if (!supabase) return { error: '未連線' }
+    const task = state.tasks.find((entry) => entry.id === taskId)
+    if (!task) return { error: '任務不存在' }
+
+    const base = 15
+    const computed = computeTaskReward(base, ratings)
     const { error } = await supabase
       .from('tasks')
       .update({
         status: 'submitted',
+        coin_reward: computed.reward,
+        reward_base: base,
+        rating_time: computed.ratings.time,
+        rating_difficulty: computed.ratings.difficulty,
+        rating_avoidance: computed.ratings.avoidance,
+        reward_multiplier: computed.multiplier,
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })

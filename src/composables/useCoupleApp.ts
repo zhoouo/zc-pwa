@@ -49,6 +49,22 @@ const state = reactive<AppState>({
 
 let realtimeChannel: RealtimeChannel | null = null
 let realtimeCoupleId = ''
+let realtimePollInterval: ReturnType<typeof setInterval> | null = null
+let visibilityListenerAttached = false
+
+const REALTIME_FALLBACK_POLL_MS = 22000
+
+const disposeCoupleRealtime = () => {
+  if (realtimePollInterval !== null) {
+    clearInterval(realtimePollInterval)
+    realtimePollInterval = null
+  }
+  if (supabase && realtimeChannel) {
+    void supabase.removeChannel(realtimeChannel)
+    realtimeChannel = null
+  }
+  realtimeCoupleId = ''
+}
 
 const isDensityMode = (value: unknown): value is AppearanceSettings['density'] =>
   value === 'airy' || value === 'compact'
@@ -204,6 +220,7 @@ export const useCoupleApp = () => {
     } = await supabase.auth.getSession()
 
     if (!session?.user) {
+      disposeCoupleRealtime()
       Object.assign(state, defaultState())
       state.isInitializing = false
       return
@@ -243,6 +260,7 @@ export const useCoupleApp = () => {
     }
 
     if (!coupleId) {
+      disposeCoupleRealtime()
       Object.assign(state, { ...defaultState(), currentUserId: 'self' as const })
       const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', myUid).maybeSingle()
       state.profiles[0].realId = myUid
@@ -351,14 +369,31 @@ export const useCoupleApp = () => {
     state.isInitializing = false
   }
 
+  const attachVisibilityRefreshOnce = () => {
+    if (typeof document === 'undefined' || visibilityListenerAttached) return
+    visibilityListenerAttached = true
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && state.coupleId) void fetchData(true)
+    })
+  }
+
+  const ensurePollFallback = () => {
+    if (typeof window === 'undefined' || realtimePollInterval !== null || !state.coupleId) return
+    realtimePollInterval = window.setInterval(() => {
+      if (document.visibilityState !== 'visible' || !state.coupleId) return
+      void fetchData(true)
+    }, REALTIME_FALLBACK_POLL_MS)
+  }
+
   const subscribeToChanges = (coupleId: string) => {
     if (!supabase) return
-    if (realtimeChannel && realtimeCoupleId === coupleId) return
-
-    if (realtimeChannel) {
-      void supabase.removeChannel(realtimeChannel)
-      realtimeChannel = null
+    if (realtimeChannel && realtimeCoupleId === coupleId) {
+      ensurePollFallback()
+      attachVisibilityRefreshOnce()
+      return
     }
+
+    disposeCoupleRealtime()
 
     const refresh = () => {
       void fetchData(true)
@@ -384,7 +419,14 @@ export const useCoupleApp = () => {
           state.appearance = parseAppearance(profile.appearance_settings)
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          void fetchData(true)
+        }
+      })
+
+    attachVisibilityRefreshOnce()
+    ensurePollFallback()
   }
 
   const createSpace = async () => {
@@ -823,6 +865,7 @@ export const useCoupleApp = () => {
   }
 
   const resetState = () => {
+    disposeCoupleRealtime()
     Object.assign(state, {
       ...defaultState(),
       isInitializing: false,

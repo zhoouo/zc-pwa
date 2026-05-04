@@ -68,6 +68,8 @@ const {
   updateTask,
   deleteTask,
   acceptTask,
+  abandonTask,
+  punishOverdueTask,
   submitTask,
   rejectTask,
   approveTask,
@@ -422,6 +424,15 @@ const connectionLabel = computed(() => {
 
 const currency = (value: number) => `${value} 枚`
 
+const isTaskOverdue = (dueAt: string | undefined | null) => {
+  if (!dueAt) return false
+  const due = new Date(dueAt)
+  due.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return due < today
+}
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(new Date(value))
 
@@ -670,6 +681,44 @@ const handleAcceptTask = (task: Task) => {
         return
       }
       pushNotify('任務已接取，可以完成後送出批准。', 'success')
+    }
+  })
+}
+
+const handleAbandonTask = (task: Task) => {
+  openConfirm({
+    title: '放棄接取',
+    message: `確定要放棄任務「${task.title}」嗎？這會讓任務回到未接取狀態。`,
+    confirmText: '放棄',
+    variant: 'danger',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await abandonTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`操作失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify('已放棄接取。', 'info')
+    }
+  })
+}
+
+const handlePunishOverdue = (task: Task) => {
+  openConfirm({
+    title: '任務過期扣你二十塊 ٩(๑`^´๑)۶',
+    message: `確認要宣告失敗並扣除二十金幣嗎？該任務將被移除。`,
+    confirmText: '確認',
+    variant: 'danger',
+    onConfirm: async () => {
+      isBusy.value = true
+      const result = await punishOverdueTask(task.id)
+      isBusy.value = false
+      if (result.error) {
+        pushNotify(`扣款失敗：${result.error}`, 'error')
+        return
+      }
+      pushNotify('已扣除金幣並移除任務。', 'info')
     }
   })
 }
@@ -1569,20 +1618,37 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </div>
                       <div class="flex items-center gap-3">
                         <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
-                        <button
-                          v-if="task.status === 'open'"
-                          class="primary-button"
-                          @click="handleAcceptTask(task)"
-                        >
-                          接取
-                        </button>
-                        <button
-                          v-else-if="task.status === 'accepted' || task.status === 'rejected'"
-                          class="primary-button"
-                          @click="handleSubmitTask(task)"
-                        >
-                          讓他批准(・∀・)
-                        </button>
+                        <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
+                          <button
+                            class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"
+                            @click="handlePunishOverdue(task)"
+                          >
+                            忘記完成啦 !!
+                          </button>
+                        </template>
+                        <template v-else>
+                          <button
+                            v-if="task.status === 'open'"
+                            class="primary-button"
+                            @click="handleAcceptTask(task)"
+                          >
+                            接取
+                          </button>
+                          <template v-else-if="task.status === 'accepted' || task.status === 'rejected'">
+                            <button
+                              class="ghost-button !py-1.5 text-ink/60"
+                              @click="handleAbandonTask(task)"
+                            >
+                              放棄接取
+                            </button>
+                            <button
+                              class="primary-button"
+                              @click="handleSubmitTask(task)"
+                            >
+                              讓他批准(・∀・)
+                            </button>
+                          </template>
+                        </template>
                       </div>
                     </article>
                   </div>
@@ -1681,20 +1747,37 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </div>
                       <div class="flex flex-col items-start gap-3 sm:items-end">
                         <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
-                        <button
-                          v-if="task.status === 'open'"
-                          class="primary-button"
-                          @click="handleAcceptTask(task)"
-                        >
-                          接取任務
-                        </button>
-                        <button
-                          v-else-if="task.status === 'accepted' || task.status === 'rejected'"
-                          class="primary-button"
-                          @click="handleSubmitTask(task)"
-                        >
-                          送出批准
-                        </button>
+                        <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
+                          <button
+                            class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"
+                            @click="handlePunishOverdue(task)"
+                          >
+                            忘記完成啦 !!
+                          </button>
+                        </template>
+                        <template v-else>
+                          <button
+                            v-if="task.status === 'open'"
+                            class="primary-button"
+                            @click="handleAcceptTask(task)"
+                          >
+                            接取任務
+                          </button>
+                          <template v-else-if="task.status === 'accepted' || task.status === 'rejected'">
+                            <button
+                              class="ghost-button !py-1.5 text-ink/60"
+                              @click="handleAbandonTask(task)"
+                            >
+                              放棄接取
+                            </button>
+                            <button
+                              class="primary-button"
+                              @click="handleSubmitTask(task)"
+                            >
+                              送出批准
+                            </button>
+                          </template>
+                        </template>
                       </div>
                     </div>
                   </article>

@@ -1617,7 +1617,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         </div>
                       </div>
                       <div class="flex items-center gap-2 task-action-group">
-                        <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
+                        <p class="text-xs sm:text-sm text-gold flex-shrink-0">{{ currency(task.coinReward) }}</p>
                         <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
                           <button
                             class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"
@@ -1746,7 +1746,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         </div>
                       </div>
                       <div class="flex items-center gap-2 task-action-group">
-                        <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
+                        <p class="text-xs sm:text-sm text-gold flex-shrink-0">{{ currency(task.coinReward) }}</p>
                         <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
                           <button
                             class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"

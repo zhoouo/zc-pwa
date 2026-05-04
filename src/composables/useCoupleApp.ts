@@ -640,6 +640,44 @@ export const useCoupleApp = () => {
     return { error: error?.message || null }
   }
 
+  const abandonTask = async (taskId: string) => {
+    if (!supabase) return { error: '未連線' }
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        status: 'open',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskId)
+      .in('status', ['accepted', 'rejected'])
+
+    await fetchData(true)
+    return { error: error?.message || null }
+  }
+
+  const punishOverdueTask = async (taskId: string) => {
+    if (!supabase || !state.coupleId) return { error: '未連線' }
+    const task = state.tasks.find((t) => t.id === taskId)
+    if (!task) return { error: '任務不存在' }
+
+    const { error: ledgerError } = await supabase.from('ledger_entries').insert({
+      couple_id: state.coupleId,
+      user_id: unmapUser(task.assigneeId),
+      entry_type: 'manual_adjustment',
+      amount: -20,
+      source_type: 'manual',
+      source_id: `penalty-${Date.now()}-${taskId.slice(-4)}`,
+      description: `任務過期懲罰：${task.title}`
+    })
+
+    if (ledgerError) return { error: ledgerError.message }
+
+    const { error: taskError } = await supabase.from('tasks').delete().eq('id', taskId)
+    
+    await fetchData(true)
+    return { error: taskError?.message || null }
+  }
+
   const submitTask = async (
     taskId: string,
     ratings: { time: number; difficulty: number; avoidance: number }
@@ -725,7 +763,7 @@ export const useCoupleApp = () => {
       const { error } = await supabase
         .from('tasks')
         .update({
-          status: 'accepted',
+          status: 'open',
           submitted_at: null,
           approved_at: null,
           rejection_note: null,
@@ -1025,6 +1063,8 @@ export const useCoupleApp = () => {
     updateTask,
     deleteTask,
     acceptTask,
+    abandonTask,
+    punishOverdueTask,
     submitTask,
     rejectTask,
     approveTask,

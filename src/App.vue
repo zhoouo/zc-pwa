@@ -1606,7 +1606,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <div class="space-y-3">
                         <div class="flex flex-wrap items-center gap-2">
                           <span class="status-pill" :class="getTaskTone(task.status)">{{ getTaskLabel(task.status) }}</span>
-                          <span class="text-xs text-ink/45">截止 {{ formatDate(task.dueAt) }}</span>
+                          <span v-if="!task.isRecurring" class="text-xs text-ink/45">截止 {{ formatDate(task.dueAt) }}</span>
                         </div>
                         <PersonChip :profile="personById(task.creatorId)" subtitle="發起人" />
                         <div>
@@ -1618,7 +1618,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </div>
                       <div class="flex items-center gap-2 task-action-group">
                         <p class="text-xs sm:text-sm text-gold flex-shrink-0">{{ currency(task.coinReward) }}</p>
-                        <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
+                        <template v-if="!task.isRecurring && isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
                           <button
                             class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"
                             @click="handlePunishOverdue(task)"
@@ -1734,7 +1734,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <div class="space-y-3">
                         <div class="flex flex-wrap items-center gap-2">
                           <span class="status-pill" :class="getTaskTone(task.status)">{{ getTaskLabel(task.status) }}</span>
-                          <span class="text-xs text-ink/45">截止 {{ formatDate(task.dueAt) }}</span>
+                          <span v-if="!task.isRecurring" class="text-xs text-ink/45">截止 {{ formatDate(task.dueAt) }}</span>
                         </div>
                         <PersonChip :profile="personById(task.creatorId)" subtitle="發起人" />
                         <div>
@@ -1747,7 +1747,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </div>
                       <div class="flex items-center gap-2 task-action-group">
                         <p class="text-xs sm:text-sm text-gold flex-shrink-0">{{ currency(task.coinReward) }}</p>
-                        <template v-if="isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
+                        <template v-if="!task.isRecurring && isTaskOverdue(task.dueAt) && task.status !== 'approved' && task.status !== 'submitted'">
                           <button
                             class="primary-button !bg-red-500 hover:!bg-red-600 !border-red-600"
                             @click="handlePunishOverdue(task)"
@@ -1841,7 +1841,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           <span>金幣</span>
                           <input v-model.number="taskEditDraft.coinReward" type="number" min="0" />
                         </label>
-                        <label class="field">
+                        <label v-if="!taskEditDraft.isRecurring" class="field">
                           <span>截止日</span>
                           <DatePicker v-model="taskEditDraft.dueAt" />
                         </label>
@@ -1909,7 +1909,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       <p class="mt-1 text-2xl text-gold">15 枚</p>
                       <p class="mt-2 text-xs text-ink/45">最終金幣會在對方「送出批准」時依評分倍率計算。</p>
                     </div>
-                    <label class="field">
+                    <label v-if="!taskForm.isRecurring" class="field">
                       <span>截止日</span>
                       <DatePicker v-model="taskForm.dueAt" />
                     </label>
@@ -2052,9 +2052,9 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                               <p class="mt-1 text-sm text-ink/60">{{ entry.note || '沒有補充說明。' }}</p>
                             </div>
                           </div>
-                          <div class="flex flex-col items-end gap-2">
+                          <div class="flex flex-col items-end gap-2 flex-shrink-0">
                             <p class="text-sm text-gold">{{ currency(entry.priceSnapshot) }}</p>
-                            <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50" @click="handleCancelRedemption(entry.id)">
+                            <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50 whitespace-nowrap" @click="handleCancelRedemption(entry.id)">
                               取消兌換
                             </button>
                           </div>

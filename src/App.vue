@@ -1611,7 +1611,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <PersonChip :profile="personById(task.creatorId)" subtitle="發起人" />
                         <div>
                           <h3 class="font-serif text-xl">{{ task.title }}</h3>
-                          <p class="mt-1 text-sm leading-6 text-ink/60">
+                          <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">
                             {{ task.description || '沒有補充說明。' }}
                           </p>
                         </div>
@@ -1709,7 +1709,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         </div>
                         <span class="status-pill bg-white/60 text-ink/70">{{ getRedemptionLabel(entry.status) }}</span>
                       </div>
-                      <p class="mt-3 text-sm text-ink/55">{{ entry.note || '沒有留下額外備註。' }}</p>
+                      <p class="mt-3 text-sm text-ink/55 whitespace-pre-wrap">{{ entry.note || '沒有留下額外備註。' }}</p>
                     </article>
                   </div>
                 </article>
@@ -1739,10 +1739,10 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <PersonChip :profile="personById(task.creatorId)" subtitle="發起人" />
                         <div>
                           <h3 class="font-serif text-xl">{{ task.title }}</h3>
-                          <p class="mt-1 text-sm leading-6 text-ink/60">
+                          <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">
                             {{ task.description || '這筆任務還沒有補充說明。' }}
                           </p>
-                          <p v-if="task.rejectionNote" class="mt-3 text-sm text-ink/55">退回原因：{{ task.rejectionNote }}</p>
+                          <p v-if="task.rejectionNote" class="mt-3 text-sm text-ink/55 whitespace-pre-wrap">退回原因：{{ task.rejectionNote }}</p>
                         </div>
                       </div>
                       <div class="flex items-center gap-2 task-action-group">
@@ -1797,7 +1797,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                       </div>
                       <p class="text-sm text-gold">{{ currency(task.coinReward) }}</p>
                     </div>
-                    <p class="text-sm leading-6 text-ink/60">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
+                    <p class="text-sm leading-6 text-ink/60 whitespace-pre-wrap">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
                     <template v-if="task.status === 'submitted'">
                       <textarea
                         v-model="rejectionDraft[task.id]"
@@ -1876,7 +1876,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <PersonChip :profile="personById(task.assigneeId)" subtitle="執行對象" />
                         <div>
                           <h3 class="font-serif text-xl">{{ task.title }}</h3>
-                          <p class="mt-1 text-sm text-ink/60">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
+                          <p class="mt-1 text-sm text-ink/60 whitespace-pre-wrap">{{ task.description || '這筆任務還沒有補充說明。' }}</p>
                         </div>
                       </div>
                       <div class="flex flex-col items-start gap-2 sm:items-end">
@@ -1968,7 +1968,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <PersonChip :profile="personById(item.creatorId)" subtitle="提供者" />
                         <div>
                           <h3 class="font-serif text-xl">{{ item.title }}</h3>
-                          <p class="mt-1 text-sm leading-6 text-ink/60">
+                          <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">
                             {{ item.description || '這個項目沒有補充說明。' }}
                           </p>
                         </div>
@@ -2019,7 +2019,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                               <h3 class="font-serif text-xl">
                                 {{ state.shopItems.find((item) => item.id === entry.shopItemId)?.title || '已刪除項目' }}
                               </h3>
-                              <p class="mt-1 text-sm text-ink/60">{{ entry.note || '沒有補充說明。' }}</p>
+                              <p class="mt-1 text-sm text-ink/60 whitespace-pre-wrap">{{ entry.note || '沒有補充說明。' }}</p>
                             </div>
                           </div>
                           <div class="flex flex-wrap gap-2">
@@ -2049,7 +2049,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                               <h3 class="font-serif text-xl">
                                 {{ state.shopItems.find((item) => item.id === entry.shopItemId)?.title || '已刪除項目' }}
                               </h3>
-                              <p class="mt-1 text-sm text-ink/60">{{ entry.note || '沒有補充說明。' }}</p>
+                              <p class="mt-1 text-sm text-ink/60 whitespace-pre-wrap">{{ entry.note || '沒有補充說明。' }}</p>
                             </div>
                           </div>
                           <div class="flex flex-col items-end gap-2 flex-shrink-0">
@@ -2086,7 +2086,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                         <PersonChip :profile="personById(item.creatorId)" subtitle="建立者" />
                         <div>
                           <h3 class="font-serif text-xl">{{ item.title }}</h3>
-                          <p class="mt-1 text-sm leading-6 text-ink/60">
+                          <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">
                             {{ item.description || '這個項目沒有補充說明。' }}
                           </p>
                         </div>
@@ -2165,7 +2165,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           <div class="flex items-start justify-between gap-3">
                             <div class="flex-1">
                               <h3 class="font-serif text-xl">{{ item.title }}</h3>
-                              <p class="mt-1 text-sm leading-6 text-ink/60">{{ item.description }}</p>
+                              <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">{{ item.description }}</p>
                             </div>
                             <div class="min-w-[120px] text-right">
                               <button class="primary-button !py-2 !text-xs" @click="handleGrantWish(item)">
@@ -2194,7 +2194,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           <div class="flex items-start justify-between gap-3">
                             <div>
                               <h3 class="font-serif text-xl">{{ item.title }}</h3>
-                              <p class="mt-1 text-sm leading-6 text-ink/60">{{ item.description }}</p>
+                              <p class="mt-1 text-sm leading-6 text-ink/60 whitespace-pre-wrap">{{ item.description }}</p>
                             </div>
                             <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50" @click="handleDeleteShopItem(item.id)">
                               刪除

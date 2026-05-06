@@ -1459,7 +1459,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
   <!-- 應用主體 -->
   <div v-else class="min-h-screen bg-paper bg-mesh text-ink" :class="appShellClasses">
     <div class="mx-auto flex min-h-screen max-w-7xl flex-col overflow-x-hidden px-4 pb-28 pt-4 sm:px-6 lg:px-8">
-      <header class="glass-panel mb-4 flex flex-col gap-4 rounded-[28px] px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
+      <header v-if="activeView === 'home'" class="glass-panel mb-4 flex flex-col gap-4 rounded-[28px] px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
         <div class="space-y-2">
           <div class="flex items-center gap-3">
             <p class="text-xs uppercase tracking-[0.24em] text-ink/45">狀態 : </p>

@@ -32,7 +32,7 @@ const emit = defineEmits(['confirm', 'cancel'])
 
         <div class="mb-6 mt-2">
           <h3 class="font-serif text-2xl text-ink">{{ title }}</h3>
-          <p class="mt-3 text-sm leading-6 text-ink/65">{{ message }}</p>
+          <p class="mt-3 text-sm leading-6 text-ink/65 whitespace-pre-wrap">{{ message }}</p>
         </div>
 
         <div v-if="$slots.default" class="mb-6">

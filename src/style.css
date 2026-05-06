@@ -330,13 +330,13 @@ label.field>span {
   }
 
   .nav-button {
-    @apply flex min-w-[56px] flex-col items-center gap-1 rounded-[18px] px-3 py-2 text-[11px] text-ink/45 transition-all duration-300;
+    @apply flex flex-1 flex-col items-center gap-1 rounded-[18px] px-3 py-2 text-[11px] text-ink/45 transition-all duration-300;
     -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
   }
 
   .nav-button-active {
-    @apply bg-white/75 text-ink;
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    @apply text-ink;
   }
 
   /* ─── AuthWall 專屬優化 ─── */
@@ -403,6 +403,19 @@ label.field>span {
   .glass-panel,
   .soft-card {
     overflow: visible;
+  }
+
+  /* 奏摺區按鍵縮小以保持橫排 */
+  .task-action-group {
+    gap: 0.3rem !important;
+  }
+  .task-action-group .primary-button,
+  .task-action-group .ghost-button {
+    padding: 0.35rem 0.45rem !important;
+    font-size: 11px !important;
+    border-radius: 12px !important;
+    white-space: nowrap !important;
+    letter-spacing: -0.01em !important;
   }
 }
 

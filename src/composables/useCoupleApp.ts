@@ -28,8 +28,8 @@ const defaultState = (): AppState => ({
   coupleId: undefined,
   currentUserId: 'self',
   profiles: [
-    { id: 'self', name: '我', title: '努力中', avatarUrl: null, avatarTone: avatarTones.self },
-    { id: 'partner', name: '對方', title: '待連線', avatarUrl: null, avatarTone: avatarTones.partner }
+    { id: 'self', name: '我', title: '被最愛的鼻最愛的鼻', avatarUrl: null, avatarTone: avatarTones.self },
+    { id: 'partner', name: '對方', title: '最愛的鼻', avatarUrl: null, avatarTone: avatarTones.partner }
   ],
   tasks: [],
   ledger: [],
@@ -313,7 +313,7 @@ export const useCoupleApp = () => {
           id: 'self',
           realId: myUid,
           name: myProfile?.nickname || '我',
-          title: myProfile?.title || '努力中',
+          title: myProfile?.title || '被最愛的鼻最愛的鼻',
           avatarUrl: myProfile?.avatar_url || null,
           avatarTone: avatarTones.self
         },
@@ -321,7 +321,7 @@ export const useCoupleApp = () => {
           id: 'partner',
           realId: partnerId || undefined,
           name: partnerProfile?.nickname || '對方',
-          title: partnerProfile?.title || '待連線',
+          title: partnerProfile?.title || '最愛的鼻',
           avatarUrl: partnerProfile?.avatar_url || null,
           avatarTone: avatarTones.partner
         }

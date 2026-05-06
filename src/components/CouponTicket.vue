@@ -156,7 +156,7 @@ const ticketId = computed(() => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[110] flex items-center justify-center p-6 backdrop-blur-xl bg-ink/60" @click.self="emit('close')">
+  <div class="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-ink/60" @click.self="emit('close')">
     <div class="relative w-full max-w-[340px] animate-ticket-in">
       <!-- 頂部關閉按鈕 -->
       <button @click="emit('close')" class="absolute -top-14 right-0 text-white/60 hover:text-white transition-colors p-2">

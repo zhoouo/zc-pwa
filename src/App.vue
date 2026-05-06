@@ -419,6 +419,119 @@ const isAnyModalOpen = computed(() =>
   !!selectedRedemptionId.value
 )
 
+const navContainerRef = ref<HTMLElement | null>(null)
+const activeIndex = computed(() => navigation.findIndex(item => item.key === activeView.value))
+const dragX = ref(0)
+const dragVelocity = ref(0)
+const isDragging = ref(false)
+let startX = 0
+let lastX = 0
+let lastTime = 0
+
+const handleNavStart = (e: MouseEvent | TouchEvent) => {
+  isDragging.value = true
+  const currentX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX
+  startX = currentX
+  lastX = currentX
+  lastTime = Date.now()
+  
+  window.addEventListener('mousemove', handleNavMove)
+  window.addEventListener('mouseup', handleNavEnd)
+  window.addEventListener('touchmove', handleNavMove, { passive: false })
+  window.addEventListener('touchend', handleNavEnd)
+}
+
+const handleNavMove = (e: MouseEvent | TouchEvent) => {
+  if (!isDragging.value) return
+  const currentX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX
+  const currentTime = Date.now()
+  
+  // 計算速度用於形變
+  const dt = currentTime - lastTime
+  if (dt > 0) {
+    const v = (currentX - lastX) / dt
+    // 平滑處理速度
+    dragVelocity.value = dragVelocity.value * 0.7 + v * 0.3
+  }
+  
+  dragX.value = currentX - startX
+  lastX = currentX
+  lastTime = currentTime
+  
+  if ('touches' in e) e.preventDefault()
+}
+
+const handleNavEnd = () => {
+  if (!isDragging.value) return
+  isDragging.value = false
+  dragVelocity.value = 0
+  
+  if (navContainerRef.value) {
+    const rect = navContainerRef.value.getBoundingClientRect()
+    const padding = window.innerWidth < 640 ? 16 : 24
+    const tabWidth = (rect.width - padding) / navigation.length
+    const movement = dragX.value / tabWidth
+    const newIndex = Math.round(activeIndex.value + movement)
+    const clampedIndex = Math.max(0, Math.min(navigation.length - 1, newIndex))
+    switchMainView(navigation[clampedIndex].key)
+  }
+  
+  dragX.value = 0
+  window.removeEventListener('mousemove', handleNavMove)
+  window.removeEventListener('mouseup', handleNavEnd)
+  window.removeEventListener('touchmove', handleNavMove)
+  window.removeEventListener('touchend', handleNavEnd)
+}
+
+const indicatorStyle = computed(() => {
+  const padding = window.innerWidth < 640 ? 8 : 12
+  const tabWidth = navContainerRef.value 
+    ? (navContainerRef.value.getBoundingClientRect().width - padding * 2) / navigation.length 
+    : 0
+  
+  const rawX = activeIndex.value * tabWidth + dragX.value
+  
+  let displayX = rawX
+  let stretch = 0
+  
+  if (isDragging.value) {
+    const nearestCenter = Math.round(rawX / tabWidth) * tabWidth
+    const dist = rawX - nearestCenter
+    const pull = Math.sin((dist / tabWidth) * Math.PI) * (tabWidth * 0.1)
+    displayX = rawX - pull
+    
+    // 根據速度計算形變（拉長感）
+    stretch = Math.min(Math.abs(dragVelocity.value) * 12, tabWidth * 0.4)
+  }
+  
+  return {
+    width: `${tabWidth + stretch}px`,
+    transform: `translateX(${displayX - (dragVelocity.value > 0 ? 0 : stretch)}px) skewX(${dragVelocity.value * 2}deg)`,
+    transition: isDragging.value ? 'none' : 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+  }
+})
+
+const getIconStyle = (index: number) => {
+  const padding = window.innerWidth < 640 ? 8 : 12
+  const tabWidth = navContainerRef.value 
+    ? (navContainerRef.value.getBoundingClientRect().width - padding * 2) / navigation.length 
+    : 0
+  
+  const indicatorX = activeIndex.value * tabWidth + dragX.value
+  const iconX = index * tabWidth
+  const dist = Math.abs(indicatorX - iconX)
+  
+  // 根據指示器的距離計算縮放比例
+  const maxScale = 1.25
+  const range = tabWidth * 0.8
+  const scale = dist < range ? 1 + (maxScale - 1) * (1 - dist / range) : 1
+  
+  return {
+    transform: `scale(${scale})`,
+    opacity: dist < range ? 1 : 0.45
+  }
+}
+
 const connectionLabel = computed(() => {
   if (!isSupabaseEnabled) {
     return 'Demo 模式'
@@ -2577,16 +2690,32 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
         </main>
 
         <nav class="fixed inset-x-0 bottom-4 z-30 mx-auto flex max-w-xl justify-center px-4">
-          <div class="glass-panel flex w-full items-center justify-between overflow-hidden rounded-[28px] px-2 py-2 sm:px-3 sm:py-3">
+          <div 
+            ref="navContainerRef"
+            class="glass-panel relative flex w-full items-center justify-between overflow-hidden rounded-[28px] px-2 py-2 sm:px-3 sm:py-3 touch-none select-none"
+            @mousedown="handleNavStart"
+            @touchstart="handleNavStart"
+          >
+            <!-- 磁吸滑動指示器 -->
+            <div 
+              class="nav-indicator absolute bottom-2 top-2 z-0 bg-white/80 shadow-sm border border-white/60"
+              :style="indicatorStyle"
+              :class="state.appearance.density === 'compact' ? 'rounded-[14px]' : 'rounded-[20px]'"
+            ></div>
+
             <button
-              v-for="item in navigation"
+              v-for="(item, index) in navigation"
               :key="item.key"
-              class="nav-button"
+              class="nav-button relative z-10"
               :class="{ 'nav-button-active': activeView === item.key }"
               @click="switchMainView(item.key)"
             >
-              <component :is="item.icon" class="h-4 w-4 flex-shrink-0" />
-              <span class="truncate">{{ item.label }}</span>
+              <component 
+                :is="item.icon" 
+                class="h-4 w-4 flex-shrink-0 transition-all duration-150" 
+                :style="getIconStyle(index)"
+              />
+              <span class="truncate" :style="{ opacity: activeView === item.key ? 1 : 0.7 }">{{ item.label }}</span>
             </button>
           </div>
         </nav>

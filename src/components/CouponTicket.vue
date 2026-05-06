@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, reactive } from 'vue'
 import type { Redemption, ShopItem, Profile } from '../types'
-import { X, Download, Share2, Ticket, Smartphone, Info } from 'lucide-vue-next'
+import { X, Ticket, Smartphone, Info } from 'lucide-vue-next'
 
 const props = defineProps<{
   redemption: Redemption
@@ -21,6 +21,10 @@ const hasPermission = ref(false)
 const target = reactive({ x: 0, y: 0 })
 const current = reactive({ x: 0, y: 0 })
 let rafId: number | null = null
+
+// 陀螺儀歸零校準基準
+const baseOrientation = reactive({ x: 0, y: 0 })
+const isCalibrated = ref(false)
 
 // 插值係數：決定跟隨的速度與滑順度 (0.1 左右最絲滑)
 const LERP_FACTOR = 0.12
@@ -77,17 +81,28 @@ const requestMotionPermission = async () => {
   }
 }
 
-// 處理陀螺儀 (手機端) - 僅更新目標值
+// 處理陀螺儀 (手機端)
 const handleMotion = (e: DeviceOrientationEvent) => {
-  // 設定一個基準角度（例如手持 45 度）
-  const rawX = (e.beta || 0) - 45 
-  const rawY = e.gamma || 0
+  const b = e.beta || 0
+  const g = e.gamma || 0
+
+  // 第一次接收到有效數據時進行自動歸零校準
+  if (!isCalibrated.value && (b !== 0 || g !== 0)) {
+    baseOrientation.x = b
+    baseOrientation.y = g
+    isCalibrated.value = true
+    return
+  }
+
+  // 計算相對於「打開時角度」的位移
+  const rawX = b - baseOrientation.x
+  const rawY = g - baseOrientation.y
   
   target.x = Math.min(Math.max(rawX / 4, -12), 12)
   target.y = Math.min(Math.max(rawY / 4, -12), 12)
 }
 
-// 處理滑鼠 (PC 端) - 僅更新目標值
+// 處理滑鼠 (PC 端)
 const handleMouseMove = (e: MouseEvent) => {
   if (isMobile.value || !ticketRef.value) return
   
@@ -100,12 +115,12 @@ const handleMouseMove = (e: MouseEvent) => {
 }
 
 const resetTilt = () => {
+  if (isMobile.value) return
   target.x = 0
   target.y = 0
 }
 
 const ticketStyle = computed(() => ({
-  // 使用 current (插值後的結果) 進行渲染
   transform: `perspective(1000px) rotateX(${current.x}deg) rotateY(${current.y}deg) translateZ(0)`,
   willChange: 'transform'
 }))
@@ -130,7 +145,6 @@ const formattedTime = computed(() => {
 })
 
 const qrUrl = computed(() => {
-  // 編碼內容為：兌換項目名稱 + 專屬表情符號
   const text = `${props.item.title} ദ്ദി/ᐠ｡‸｡ᐟ\\ `
   const encodedData = encodeURIComponent(text)
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodedData}`
@@ -218,26 +232,10 @@ const ticketId = computed(() => {
             
             <div class="text-right">
               <p class="text-[9px] uppercase tracking-[0.15em] text-ink/30 font-bold">Issued By</p>
-              <p class="font-serif text-sm text-ink/60 italic font-medium">ZC Private</p>
+              <p class="font-serif text-sm text-ink/60 italic font-medium">ZC</p>
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- 操作按鈕 -->
-      <div class="mt-10 flex justify-center gap-8">
-        <button class="flex flex-col items-center gap-3 text-white/60 hover:text-white transition-all hover:scale-110">
-          <div class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center border border-white/20 backdrop-blur-md shadow-lg">
-            <Download class="h-6 w-6" />
-          </div>
-          <span class="text-[10px] uppercase tracking-[0.25em] font-bold">儲存圖片</span>
-        </button>
-        <button class="flex flex-col items-center gap-3 text-white/60 hover:text-white transition-all hover:scale-110">
-          <div class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center border border-white/20 backdrop-blur-md shadow-lg">
-            <Share2 class="h-6 w-6" />
-          </div>
-          <span class="text-[10px] uppercase tracking-[0.25em] font-bold">分享票券</span>
-        </button>
       </div>
 
       <!-- 提示與權限 -->

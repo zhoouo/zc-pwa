@@ -19,7 +19,7 @@ const emit = defineEmits(['confirm', 'cancel'])
   <Transition name="modal">
     <div v-if="show" class="fixed inset-0 z-[100] flex items-center justify-center px-4">
       <!-- Backdrop -->
-      <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" @click="emit('cancel')"></div>
+      <div class="absolute inset-0 bg-ink/20" @click="emit('cancel')"></div>
       
       <!-- Modal Content -->
       <article class="glass-panel relative w-full max-w-sm scale-100 rounded-[32px] p-6 shadow-2xl transition-all sm:p-8">

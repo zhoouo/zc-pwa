@@ -412,6 +412,13 @@ const appShellClasses = computed(() => [
   state.appearance.glass === 'muted' ? 'glass-muted' : 'glass-luminous'
 ])
 
+const isAnyModalOpen = computed(() => 
+  confirmModal.show || 
+  noticeModal.show || 
+  !!selectedImageUrl.value || 
+  !!selectedRedemptionId.value
+)
+
 const connectionLabel = computed(() => {
   if (!isSupabaseEnabled) {
     return 'Demo 模式'
@@ -1460,7 +1467,10 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 
   <!-- 應用主體 -->
   <div v-else class="min-h-screen bg-paper bg-mesh text-ink" :class="appShellClasses">
-    <div class="mx-auto flex min-h-screen max-w-7xl flex-col overflow-x-hidden px-4 pb-28 pt-4 sm:px-6 lg:px-8">
+    <div 
+      class="mx-auto flex min-h-screen max-w-7xl flex-col overflow-x-hidden px-4 pb-28 pt-4 sm:px-6 lg:px-8 transition-all duration-500"
+      :class="{ 'main-content-blur': isAnyModalOpen }"
+    >
       <header v-if="activeView === 'home'" class="glass-panel mb-4 flex flex-col gap-4 rounded-[28px] px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
         <div class="space-y-2">
           <div class="flex items-center gap-3">
@@ -2586,7 +2596,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
 
   <!-- 圖片大圖檢視 -->
   <transition name="fade">
-    <div v-if="selectedImageUrl" class="fixed inset-0 z-[100] flex items-center justify-center bg-ink/90 p-4 backdrop-blur-md" @click="selectedImageUrl = null">
+    <div v-if="selectedImageUrl" class="fixed inset-0 z-[100] flex items-center justify-center bg-ink/90 p-4" @click="selectedImageUrl = null">
       <button class="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
         <X class="h-6 w-6" />
       </button>
@@ -2691,3 +2701,17 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
     @close="selectedRedemptionId = null"
   />
 </template>
+
+<style>
+.main-content-blur {
+  filter: blur(12px) brightness(0.9) saturate(1.2);
+  transform: scale(0.98);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 確保所有玻璃面板在模糊背景下依然清晰 */
+.main-content-blur .glass-panel {
+  backdrop-filter: none !important;
+}
+</style>

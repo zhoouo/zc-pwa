@@ -30,6 +30,7 @@ import DatePicker from './components/DatePicker.vue'
 import { useCoupleApp } from './composables/useCoupleApp'
 import { useSupabaseAuth } from './composables/useSupabaseAuth'
 import ConfirmModal from './components/ConfirmModal.vue'
+import CouponTicket from './components/CouponTicket.vue'
 import type {
   DensityMode,
   GlassMode,
@@ -118,6 +119,7 @@ const editingTaskId = ref<string | null>(null)
 const shopImageInput = ref<HTMLInputElement | null>(null)
 const wishImageInput = ref<HTMLInputElement | null>(null)
 const avatarInput = ref<HTMLInputElement | null>(null)
+const selectedRedemptionId = ref<string | null>(null)
 const banner = reactive({
   text: 'ヾ(^▽^*))',
   type: 'info' as 'info' | 'success' | 'error',
@@ -2023,6 +2025,7 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                             </div>
                           </div>
                           <div class="flex flex-wrap gap-2">
+                            <button class="ghost-button" @click="selectedRedemptionId = entry.id">查看票券</button>
                             <button class="ghost-button" @click="handleCancelRedemption(entry.id)">取消</button>
                             <button class="ghost-button" @click="handleUpdateRedemptionStatus(entry.id, 'in_progress')">待履行</button>
                             <button class="primary-button" @click="handleUpdateRedemptionStatus(entry.id, 'fulfilled')">標記完成</button>
@@ -2054,6 +2057,9 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                           </div>
                           <div class="flex flex-col items-end gap-2 flex-shrink-0">
                             <p class="text-sm text-gold">{{ currency(entry.priceSnapshot) }}</p>
+                            <button class="ghost-button !py-1.5 whitespace-nowrap" @click="selectedRedemptionId = entry.id">
+                              查看票券
+                            </button>
                             <button class="ghost-button !py-1.5 text-red-500/70 hover:!bg-red-50 whitespace-nowrap" @click="handleCancelRedemption(entry.id)">
                               取消兌換
                             </button>
@@ -2671,5 +2677,14 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
     hide-cancel
     @confirm="noticeModal.show = false"
     @cancel="noticeModal.show = false"
+  />
+
+  <CouponTicket
+    v-if="selectedRedemptionId && state.redemptions.find(r => r.id === selectedRedemptionId)"
+    :redemption="state.redemptions.find(r => r.id === selectedRedemptionId)!"
+    :item="state.shopItems.find(i => i.id === state.redemptions.find(r => r.id === selectedRedemptionId)!.shopItemId)!"
+    :redeemer="personById(state.redemptions.find(r => r.id === selectedRedemptionId)!.redeemerId)"
+    :provider="personById(state.redemptions.find(r => r.id === selectedRedemptionId)!.creatorId)"
+    @close="selectedRedemptionId = null"
   />
 </template>

@@ -1709,7 +1709,10 @@ const personById = (userId: UserId): Profile => profileMap.value[userId]
                             {{ state.shopItems.find((item) => item.id === entry.shopItemId)?.title || '已刪除項目' }}
                           </h3>
                         </div>
-                        <span class="status-pill bg-white/60 text-ink/70">{{ getRedemptionLabel(entry.status) }}</span>
+                          <div class="flex flex-col items-end gap-2">
+                            <button class="ghost-button !py-1 !px-2.5 !text-[11px] opacity-60 hover:opacity-100" @click="selectedRedemptionId = entry.id">查看票券</button>
+                            <span class="status-pill bg-white/60 text-ink/70">{{ getRedemptionLabel(entry.status) }}</span>
+                          </div>
                       </div>
                       <p class="mt-3 text-sm text-ink/55 whitespace-pre-wrap">{{ entry.note || '沒有留下額外備註。' }}</p>
                     </article>

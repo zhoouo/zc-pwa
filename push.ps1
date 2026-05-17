@@ -48,9 +48,11 @@ Write-Host "📦 正在加入檔案暫存區 (git add .)..." -ForegroundColor Ye
 git add .
 
 Write-Host "✍️ 正在提交變更 (git commit)..." -ForegroundColor Yellow
-$commitResult = git commit -m $commit_msg 2>&1
+$commitResult = git commit -m $commit_msg 2>&1 | ForEach-Object { $_.ToString() }
 $commitResult | ForEach-Object {
-    Write-Host "   $_" -ForegroundColor Gray
+    if (![string]::IsNullOrWhiteSpace($_)) {
+        Write-Host "   $_" -ForegroundColor Gray
+    }
 }
 
 Write-Host ""
@@ -60,7 +62,8 @@ $pwdPath = $PWD.Path
 $pushJob = Start-Job -ScriptBlock {
     param($pwd)
     Set-Location -Path $pwd
-    $output = git push 2>&1 | Out-String
+    # 使用 cmd /c 執行以避免 PowerShell 將 stderr 的進度訊息轉換成 ErrorRecord 紅字
+    $output = cmd /c "git push 2>&1" | Out-String
     return [PSCustomObject]@{
         Output = $output
         ExitCode = $LASTEXITCODE

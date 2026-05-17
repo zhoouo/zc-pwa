@@ -39,7 +39,7 @@
       </div>
       
       <button ref="btnRef" @click="claim" class="primary-button w-full shadow-xl shadow-gold/20 py-4 text-base rounded-[20px] opacity-0 font-bold tracking-widest relative overflow-hidden">
-        $͜ (^ ̮ ^)›
+        打開看看
       </button>
     </div>
   </div>

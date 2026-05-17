@@ -9,7 +9,32 @@ Write-Host ""
 
 # 1. 檢查 Git 狀態
 Write-Host "🔍 正在檢查檔案變更狀態..." -ForegroundColor Yellow
-git status -s
+
+$status = git status --porcelain
+if ([string]::IsNullOrWhiteSpace($status)) {
+    Write-Host "✨ 沒有檢測到任何需要上傳的變更！" -ForegroundColor Green
+    Write-Host ""
+    Read-Host "請按 Enter 鍵結束..."
+    exit
+}
+
+Write-Host ""
+Write-Host "📂 檢測到以下變更檔案：" -ForegroundColor Cyan
+$status -split "`r?`n" | ForEach-Object {
+    if ($_.Length -gt 3) {
+        $code = $_.Substring(0, 2).Trim()
+        $file = $_.Substring(3)
+        switch ($code) {
+            "M" { Write-Host "   [修改] $file" -ForegroundColor Yellow }
+            "A" { Write-Host "   [新增] $file" -ForegroundColor Green }
+            "D" { Write-Host "   [刪除] $file" -ForegroundColor Red }
+            "??" { Write-Host "   [新建] $file" -ForegroundColor Cyan }
+            "R" { Write-Host "   [更名] $file" -ForegroundColor Magenta }
+            "UU" { Write-Host "   [衝突] $file" -ForegroundColor DarkRed }
+            default { Write-Host "   [變更] $file" -ForegroundColor Gray }
+        }
+    }
+}
 Write-Host ""
 
 # 2. 輸入提交訊息
@@ -23,14 +48,56 @@ Write-Host "📦 正在加入檔案暫存區 (git add .)..." -ForegroundColor Ye
 git add .
 
 Write-Host "✍️ 正在提交變更 (git commit)..." -ForegroundColor Yellow
-git commit -m $commit_msg
+$commitResult = git commit -m $commit_msg 2>&1
+$commitResult | ForEach-Object {
+    Write-Host "   $_" -ForegroundColor Gray
+}
 
 Write-Host ""
-Write-Host "📤 正在上傳至 GitHub (git push)..." -ForegroundColor Yellow
-git push
+
+# 3. 使用背景工作執行 git push，並顯示動畫 spinner
+$pwdPath = $PWD.Path
+$pushJob = Start-Job -ScriptBlock {
+    param($pwd)
+    Set-Location -Path $pwd
+    $output = git push 2>&1 | Out-String
+    return [PSCustomObject]@{
+        Output = $output
+        ExitCode = $LASTEXITCODE
+    }
+} -ArgumentList $pwdPath
+
+$spinner = @('⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏')
+$index = 0
+
+while ($pushJob.State -eq "Running") {
+    $char = $spinner[$index]
+    Write-Host "`r$char 正在上傳至 GitHub (git push)..." -NoNewline -ForegroundColor Cyan
+    Start-Sleep -Milliseconds 100
+    $index = ($index + 1) % $spinner.Length
+}
+
+# 清除 Spinner 這一行
+Write-Host "`r                                                                `r" -NoNewline
+
+# 接收結果並判斷是否成功
+$result = Receive-Job -Job $pushJob
+Remove-Job -Job $pushJob
+
+$pushOutput = $result.Output
+$exitCode = $result.ExitCode
+
+# 列印 Git Push 的輸出
+if (![string]::IsNullOrWhiteSpace($pushOutput)) {
+    $pushOutput -split "`r?`n" | ForEach-Object {
+        if (![string]::IsNullOrWhiteSpace($_)) {
+            Write-Host "   $_" -ForegroundColor Gray
+        }
+    }
+}
 
 Write-Host ""
-if ($LASTEXITCODE -eq 0) {
+if ($exitCode -eq 0) {
     Write-Host "====================================================" -ForegroundColor Green
     Write-Host "🎉 上傳成功！您的變更已同步到 GitHub！" -ForegroundColor Green
     Write-Host "====================================================" -ForegroundColor Green

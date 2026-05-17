@@ -21,3 +21,8 @@ create policy "Users can manage own push subscriptions" on public.push_subscript
 
 -- Create index for performance
 create index if not exists idx_push_subscriptions_couple_user on public.push_subscriptions(couple_id, user_id);
+
+-- 授權 API 角色存取此資料表 (為了支援 Supabase 2026/05/30 安全性更新)
+grant select on public.push_subscriptions to anon;
+grant select, insert, update, delete on public.push_subscriptions to authenticated, service_role;
+

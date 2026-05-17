@@ -197,3 +197,29 @@
     delete from auth.users where id = auth.uid();
   end;
   $$ language plpgsql security definer;
+
+  -- 授權 API 角色存取所有資料表 (為了支援 Supabase 2026/05/30 安全性更新)
+  grant select on public.profiles to anon;
+  grant select, insert, update, delete on public.profiles to authenticated, service_role;
+
+  grant select on public.couples to anon;
+  grant select, insert, update, delete on public.couples to authenticated, service_role;
+
+  grant select on public.couple_members to anon;
+  grant select, insert, update, delete on public.couple_members to authenticated, service_role;
+
+  grant select on public.invite_codes to anon;
+  grant select, insert, update, delete on public.invite_codes to authenticated, service_role;
+
+  grant select on public.tasks to anon;
+  grant select, insert, update, delete on public.tasks to authenticated, service_role;
+
+  grant select on public.ledger_entries to anon;
+  grant select, insert, update, delete on public.ledger_entries to authenticated, service_role;
+
+  grant select on public.shop_items to anon;
+  grant select, insert, update, delete on public.shop_items to authenticated, service_role;
+
+  grant select on public.redemptions to anon;
+  grant select, insert, update, delete on public.redemptions to authenticated, service_role;
+

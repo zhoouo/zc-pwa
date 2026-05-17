@@ -7,6 +7,9 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
         name: 'ZC',

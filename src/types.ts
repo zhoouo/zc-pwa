@@ -3,6 +3,22 @@ export type DensityMode = 'airy' | 'compact'
 export type MotionMode = 'soft' | 'still'
 export type GlassMode = 'luminous' | 'muted'
 
+export const notificationPreferenceKeys = [
+  'partnerTaskAssigned',
+  'partnerTaskProgress',
+  'partnerTaskReviewed',
+  'partnerShopUpdated',
+  'partnerRedemption',
+  'selfTaskCreated',
+  'selfTaskProgress',
+  'selfTaskReviewed',
+  'selfShopUpdated',
+  'selfRedemption'
+] as const
+
+export type NotificationPreferenceKey = (typeof notificationPreferenceKeys)[number]
+export type NotificationPreferenceMap = Record<NotificationPreferenceKey, boolean>
+
 export type TaskStatus = 'open' | 'accepted' | 'submitted' | 'approved' | 'rejected' | 'cancelled'
 export type EntryType = 'task_reward' | 'shop_redeem' | 'manual_adjustment'
 export type SourceType = 'task' | 'redemption' | 'manual'
@@ -50,6 +66,8 @@ export interface ShopItem {
   title: string
   description: string
   price: number
+  isProduct: boolean
+  realPrice?: number | null
   category: string
   creatorId: UserId
   isActive: boolean
@@ -61,6 +79,9 @@ export interface ShopItem {
 export interface Redemption {
   id: string
   shopItemId: string
+  /** 資料庫 UUID，QR 簽名用（與 self/partner 視角無關） */
+  creatorDbId: string
+  redeemerDbId: string
   creatorId: UserId
   redeemerId: UserId
   priceSnapshot: number
@@ -81,6 +102,11 @@ export interface AppearanceSettings {
   glass: GlassMode
 }
 
+export interface NotificationSettings {
+  enabled: boolean
+  events: NotificationPreferenceMap
+}
+
 export interface BindingInfo {
   inviteCode: string
   status: 'demo' | 'idle' | 'paired' | 'pending'
@@ -97,5 +123,7 @@ export interface AppState {
   shopItems: ShopItem[]
   redemptions: Redemption[]
   appearance: AppearanceSettings
+  notifications: NotificationSettings
   binding: BindingInfo
+  tags: string[]
 }

@@ -5,18 +5,18 @@
     nickname text not null,
     title text,
     avatar_url text,
-    appearance_settings jsonb not null default '{"density":"airy","motion":"soft","glass":"luminous"}'::jsonb,
+    appearance_settings jsonb not null default '{"density":"airy","motion":"soft","glass":"luminous","notifications":{"enabled":false,"events":{"partnerTaskAssigned":true,"partnerTaskProgress":true,"partnerTaskReviewed":true,"partnerShopUpdated":true,"partnerRedemption":true,"selfTaskCreated":true,"selfTaskProgress":true,"selfTaskReviewed":true,"selfShopUpdated":true,"selfRedemption":true}}}'::jsonb,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
   );
 
-  alter table public.profiles
-    add column if not exists appearance_settings jsonb not null default '{"density":"airy","motion":"soft","glass":"luminous"}'::jsonb;
 
   create table if not exists public.couples (
     id uuid primary key default gen_random_uuid(),
+    custom_tags text[] default array[]::text[],
     created_at timestamptz not null default now()
   );
+
 
   create table if not exists public.couple_members (
     id uuid primary key default gen_random_uuid(),
@@ -43,6 +43,11 @@
     title text not null,
     description text,
     coin_reward integer not null check (coin_reward >= 0),
+    reward_base integer not null default 15,
+    rating_time smallint,
+    rating_difficulty smallint,
+    rating_avoidance smallint,
+    reward_multiplier numeric,
     due_at date,
     status text not null check (status in ('open', 'accepted', 'submitted', 'approved', 'rejected', 'cancelled')),
     rejection_note text,
@@ -83,6 +88,8 @@
     title text not null,
     description text,
     price integer not null check (price >= 0),
+    is_product boolean not null default false,
+    real_price numeric,
     category text,
     is_active boolean not null default true,
     is_hidden boolean not null default false,
@@ -113,16 +120,58 @@
   alter table public.shop_items enable row level security;
   alter table public.redemptions enable row level security;
 
-  -- 為求快速驗證，先開放給所有已登入使用者 (Authenticated) 讀寫權限
-  -- 正式上線前可依 couple_id 進一步限縮
-  create policy "Allow all for authenticated on profiles" on public.profiles for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on couples" on public.couples for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on couple_members" on public.couple_members for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on invite_codes" on public.invite_codes for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on tasks" on public.tasks for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on ledger_entries" on public.ledger_entries for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on shop_items" on public.shop_items for all using (auth.role() = 'authenticated');
-  create policy "Allow all for authenticated on redemptions" on public.redemptions for all using (auth.role() = 'authenticated');
+  -- Profiles: 允許讀取所有人的基本資料（否則看不到夥伴），僅限本人修改
+  drop policy if exists "Profiles are viewable by authenticated users" on public.profiles;
+  drop policy if exists "Users can update own profile" on public.profiles;
+  drop policy if exists "Users can manage own profile" on public.profiles;
+  
+  create policy "Profiles are viewable by authenticated users" on public.profiles
+    for select using (auth.role() = 'authenticated');
+  create policy "Users can update own profile" on public.profiles
+    for update using (auth.uid() = id);
+
+  -- Couples: 僅限成員存取
+  drop policy if exists "Members can view/update couple space" on public.couples;
+  drop policy if exists "Allow select for members on couples" on public.couples;
+  drop policy if exists "Allow update for members on couples" on public.couples;
+
+  create policy "Allow select for members on couples" on public.couples 
+    for select using (exists (select 1 from public.couple_members where couple_id = public.couples.id and user_id = auth.uid()));
+  create policy "Allow update for members on couples" on public.couples 
+    for update using (exists (select 1 from public.couple_members where couple_id = public.couples.id and user_id = auth.uid()));
+
+  -- Couple Members: 允許讀取（為了抓取夥伴資訊），僅限本人管理
+  drop policy if exists "Couple members are viewable by authenticated users" on public.couple_members;
+  drop policy if exists "Users can manage own membership" on public.couple_members;
+  drop policy if exists "Members can view/manage membership" on public.couple_members;
+  drop policy if exists "Public select on couple_members" on public.couple_members;
+
+  create policy "Public select on couple_members" on public.couple_members
+    for select using (auth.role() = 'authenticated');
+  create policy "Users can manage own membership" on public.couple_members
+    for all using (user_id = auth.uid());
+
+  -- Invite Codes: 建立者可管理
+  drop policy if exists "Creators can manage invite codes" on public.invite_codes;
+  create policy "Creators can manage invite codes" on public.invite_codes
+    for all using (created_by = auth.uid());
+
+  -- Tasks, Ledger, Shop, Redemptions: 空間成員共用
+  drop policy if exists "Members can manage tasks" on public.tasks;
+  create policy "Members can manage tasks" on public.tasks 
+    for all using (exists (select 1 from public.couple_members cm where cm.couple_id = public.tasks.couple_id and cm.user_id = auth.uid()));
+
+  drop policy if exists "Members can manage ledger entries" on public.ledger_entries;
+  create policy "Members can manage ledger entries" on public.ledger_entries
+    for all using (exists (select 1 from public.couple_members cm where cm.couple_id = public.ledger_entries.couple_id and cm.user_id = auth.uid()));
+
+  drop policy if exists "Members can manage shop items" on public.shop_items;
+  create policy "Members can manage shop items" on public.shop_items
+    for all using (exists (select 1 from public.couple_members cm where cm.couple_id = public.shop_items.couple_id and cm.user_id = auth.uid()));
+
+  drop policy if exists "Members can manage redemptions" on public.redemptions;
+  create policy "Members can manage redemptions" on public.redemptions
+    for all using (exists (select 1 from public.couple_members cm where cm.couple_id = public.redemptions.couple_id and cm.user_id = auth.uid()));
 
   -- 自動建立 Profile 的 Trigger
   create or replace function public.handle_new_user()

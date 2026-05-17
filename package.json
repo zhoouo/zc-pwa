@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "push": "push.bat"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

@@ -22,10 +22,17 @@ export const activeGifts: GiftConfig[] = [
     storageKey: '200天紀念日'
   },
   {
-  targetDate: '2026-05-18',
-  title: '200天紀念日!!!',
-  description: '普發20',
-  coins: 20,
-  storageKey: '普發20'
+  targetDate: '2026-05-20',
+  title: '520快樂!!!',
+  description: '鼻鼻我愛你',
+  coins: 1314,
+  storageKey: '2026-05-20-1314'
+  },
+  {
+  targetDate: '2026-05-20',
+  title: '520快樂!!!',
+  description: '鼻鼻我超級愛你',
+  coins: 520,
+  storageKey: '2026-05-20-520'
   }
 ]

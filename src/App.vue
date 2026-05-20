@@ -35,7 +35,7 @@ import { useSupabaseAuth } from './composables/useSupabaseAuth'
 import ConfirmModal from './components/ConfirmModal.vue'
 import CouponTicket from './components/CouponTicket.vue'
 import GiftPopup from './components/GiftPopup.vue'
-import { activeGifts } from './config/gifts'
+import { activeGifts, type GiftConfig } from './config/gifts'
 import type {
   DensityMode,
   GlassMode,
@@ -158,14 +158,96 @@ const banner = reactive({
 })
 let bannerTimer: number | null = null
 
-const handleGiftClaim = async (coins: number, description: string) => {
-  const result = await addSystemReward(coins, description)
+const giftQueue = ref<GiftConfig[]>([])
+const claimedGiftBuffer = ref<GiftConfig[]>([])
+const isGiftSequenceCompleting = ref(false)
+const currentGift = computed(() => giftQueue.value[0] ?? null)
+
+const getTodayGiftKeys = (date = new Date()) => {
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return {
+    year: yyyy,
+    currentDate: `${yyyy}-${mm}-${dd}`,
+    currentMonthDay: `${mm}-${dd}`
+  }
+}
+
+const getGiftLedgerTag = (gift: GiftConfig) => `[禮物:${gift.storageKey}]`
+
+const getGiftClaimStorageKey = (gift: GiftConfig, year = getTodayGiftKeys().year) =>
+  `gift_claimed_${gift.storageKey}_${year}`
+
+const isGiftScheduledToday = (gift: GiftConfig, date = new Date()) => {
+  const { currentDate, currentMonthDay } = getTodayGiftKeys(date)
+  return gift.targetDate === currentDate || gift.targetDate === currentMonthDay
+}
+
+const isGiftClaimedInLedger = (gift: GiftConfig) => {
+  const giftTag = getGiftLedgerTag(gift)
+  return state.ledger.some(entry =>
+    entry.userId === 'self' &&
+    entry.entryType === 'manual_adjustment' &&
+    entry.sourceType === 'manual' &&
+    entry.description.includes(giftTag)
+  )
+}
+
+const isGiftClaimedInStorage = (gift: GiftConfig) =>
+  localStorage.getItem(getGiftClaimStorageKey(gift)) === 'true'
+
+const isGiftEligibleForQueue = (gift: GiftConfig) =>
+  isGiftScheduledToday(gift) && !isGiftClaimedInLedger(gift) && !isGiftClaimedInStorage(gift)
+
+const refreshGiftQueue = () => {
+  if (!isAuthenticated.value || authLoading.value || state.isInitializing) {
+    giftQueue.value = []
+    claimedGiftBuffer.value = []
+    return
+  }
+
+  if (giftQueue.value.length || claimedGiftBuffer.value.length || isGiftSequenceCompleting.value) return
+
+  giftQueue.value = activeGifts.filter(isGiftEligibleForQueue)
+}
+
+const markGiftClaimedInStorage = (gift: GiftConfig) => {
+  localStorage.setItem(getGiftClaimStorageKey(gift), 'true')
+}
+
+const completeGiftClaims = async () => {
+  const claimedGifts = [...claimedGiftBuffer.value]
+  if (!claimedGifts.length) return
+
+  isGiftSequenceCompleting.value = true
+  const totalCoins = claimedGifts.reduce((sum, gift) => sum + gift.coins, 0)
+  const description = claimedGifts.map((gift) => `${getGiftLedgerTag(gift)} ${gift.title}`).join('、')
+  const result = await addSystemReward(totalCoins, description, 'self')
+
   if (result.error) {
     pushNotify(`領取失敗：${result.error}`, 'error')
+    giftQueue.value = claimedGifts
   } else {
+    claimedGifts.forEach(markGiftClaimedInStorage)
     switchMainView('ledger')
-    pushNotify(`恭喜！你獲得了 ${coins} 枚金幣`, 'success')
+    const giftCountText = claimedGifts.length > 1 ? `${claimedGifts.length} 份禮物` : '禮物'
+    pushNotify(`恭喜！你領完${giftCountText}，獲得 ${totalCoins} 枚金幣`, 'success')
   }
+
+  claimedGiftBuffer.value = []
+  isGiftSequenceCompleting.value = false
+}
+
+const handleGiftClaim = async () => {
+  const claimedGift = currentGift.value
+  if (!claimedGift) return
+
+  claimedGiftBuffer.value = [...claimedGiftBuffer.value, claimedGift]
+  giftQueue.value = giftQueue.value.slice(1)
+
+  if (giftQueue.value.length) return
+  await completeGiftClaims()
 }
 
 const pushNotify = (msg: string, type: 'info' | 'success' | 'error' = 'info', duration = 4000) => {
@@ -623,9 +705,18 @@ const cleanupLocalStorageGifts = () => {
   }
 }
 
+watch(
+  () => [isAuthenticated.value, authLoading.value, state.isInitializing, state.ledger] as const,
+  () => {
+    refreshGiftQueue()
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   syncNotificationEnvironment()
   cleanupLocalStorageGifts()
+  refreshGiftQueue()
   document.addEventListener('visibilitychange', syncNotificationEnvironment)
   
   // Initialize push notifications
@@ -4149,13 +4240,13 @@ const formatEntryDescription = (desc: string) => {
 
   <template v-if="isAuthenticated && !state.isInitializing && !authLoading">
     <GiftPopup 
-      v-for="gift in activeGifts"
-      :key="gift.storageKey"
-      :target-date="gift.targetDate"
-      :title="gift.title"
-      :description="gift.description"
-      :coins="gift.coins"
-      :storage-key="gift.storageKey"
+      v-if="currentGift"
+      :key="currentGift.storageKey"
+      :target-date="currentGift.targetDate"
+      :title="currentGift.title"
+      :description="currentGift.description"
+      :coins="currentGift.coins"
+      :storage-key="currentGift.storageKey"
       @claim="handleGiftClaim"
     />
   </template>

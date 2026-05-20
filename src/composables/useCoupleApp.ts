@@ -919,12 +919,12 @@ export const useCoupleApp = () => {
     return deleteTask(taskId)
   }
 
-  const addSystemReward = async (amount: number, description: string) => {
+  const addSystemReward = async (amount: number, description: string, userId: UserId = state.currentUserId) => {
     if (!supabase || !state.coupleId) return { error: '未連線' }
     
     const { error } = await supabase.from('ledger_entries').insert({
       couple_id: state.coupleId,
-      user_id: unmapUser(state.currentUserId),
+      user_id: unmapUser(userId),
       entry_type: 'manual_adjustment',
       amount,
       source_type: 'manual',

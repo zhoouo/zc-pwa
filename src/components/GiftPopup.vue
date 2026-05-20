@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isVisible" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-ink/40 backdrop-blur-sm transition-all duration-500" @click.self="close">
+  <div v-if="isVisible" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-ink/40 backdrop-blur-sm transition-all duration-500">
     <div ref="popupRef" class="glass-panel rounded-[28px] w-full max-w-[340px] p-8 flex flex-col items-center relative overflow-visible font-serif opacity-0" style="transform: scale(0.9);">
       
       <!-- Fireworks Particles Container -->
@@ -38,7 +38,7 @@
         <span class="text-sm tracking-[0.25em] text-ink/70 uppercase font-bold bg-mist/80 px-3 py-1 rounded-full shadow-sm mt-2">Coins</span>
       </div>
       
-      <button ref="btnRef" @click="claim" class="primary-button w-full shadow-xl shadow-gold/20 py-4 text-base rounded-[20px] opacity-0 font-bold tracking-widest relative overflow-hidden">
+      <button ref="btnRef" :disabled="isClaiming" @click="claim" class="primary-button w-full shadow-xl shadow-gold/20 py-4 text-base rounded-[20px] opacity-0 font-bold tracking-widest relative overflow-hidden">
         打開看看
       </button>
     </div>
@@ -46,11 +46,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { animate, stagger } from 'animejs'
-import { useCoupleApp } from '../composables/useCoupleApp'
 
-const props = defineProps({
+defineProps({
   targetDate: { type: String, required: true }, // Format: 'MM-DD' or 'YYYY-MM-DD'
   title: { type: String, default: '禮物!!' },
   description: { type: String, default: '打開看看(づ> v <)づ♡！' },
@@ -58,11 +57,12 @@ const props = defineProps({
   storageKey: { type: String, required: true }
 })
 
-const emit = defineEmits(['claim'])
-
-const { state } = useCoupleApp()
+const emit = defineEmits<{
+  claim: []
+}>()
 
 const isVisible = ref(false)
+const isClaiming = ref(false)
 const popupRef = ref<HTMLElement | null>(null)
 const boxContainerRef = ref<HTMLElement | null>(null)
 const boxLidRef = ref<HTMLElement | null>(null)
@@ -71,39 +71,22 @@ const textRef = ref<HTMLElement | null>(null)
 const btnRef = ref<HTMLElement | null>(null)
 const coinRef = ref<HTMLElement | null>(null)
 const fireworksRef = ref<HTMLElement | null>(null)
+let entranceTimer: number | null = null
 
 onMounted(() => {
-  const today = new Date()
-  const yyyy = today.getFullYear()
-  const mm = String(today.getMonth() + 1).padStart(2, '0')
-  const dd = String(today.getDate()).padStart(2, '0')
-  const currentDate = `${yyyy}-${mm}-${dd}`
-  const currentMonthDay = `${mm}-${dd}`
+  isVisible.value = true
 
-  const isMatch = props.targetDate === currentDate || props.targetDate === currentMonthDay
-  
-  if (isMatch) {
-    // Check if the ledger contains a record of claiming this gift
-    const giftTag = `[禮物:${props.storageKey}]`
-    const alreadyClaimedInLedger = state.ledger.some(entry => 
-      entry.userId === 'self' &&
-      entry.entryType === 'manual_adjustment' &&
-      entry.sourceType === 'manual' &&
-      entry.description.includes(giftTag)
-    )
+  // Give the browser enough time to complete the loader fade-out transition
+  // before dropping the heavy box animation!
+  entranceTimer = window.setTimeout(() => {
+    void nextTick(startEntranceAnimation)
+  }, 450)
+})
 
-    // Check localStorage as secondary lock
-    const alreadyClaimedInStorage = localStorage.getItem(`gift_claimed_${props.storageKey}_${yyyy}`)
-
-    if (!alreadyClaimedInLedger && !alreadyClaimedInStorage) {
-      isVisible.value = true
-      
-      // Give the browser enough time to complete the loader fade-out transition
-      // before dropping the heavy box animation!
-      setTimeout(() => {
-        startEntranceAnimation()
-      }, 450)
-    }
+onBeforeUnmount(() => {
+  if (entranceTimer !== null) {
+    window.clearTimeout(entranceTimer)
+    entranceTimer = null
   }
 })
 
@@ -156,6 +139,9 @@ const startEntranceAnimation = () => {
 }
 
 const claim = () => {
+  if (isClaiming.value) return
+  isClaiming.value = true
+
   // Hide text and button quickly
   animate([textRef.value, btnRef.value], {
     opacity: 0,
@@ -235,24 +221,9 @@ const claim = () => {
       ease: 'inQuad',
       onComplete: () => {
         isVisible.value = false
-        const today = new Date()
-        localStorage.setItem(`gift_claimed_${props.storageKey}_${today.getFullYear()}`, 'true')
-        emit('claim', props.coins, `[禮物:${props.storageKey}] ${props.title}`)
+        emit('claim')
       }
     })
   }, 2600)
-}
-
-const close = () => {
-  animate(popupRef.value, {
-    scale: 0.95,
-    y: 10,
-    opacity: 0,
-    duration: 300,
-    ease: 'inQuad',
-    onComplete: () => {
-      isVisible.value = false
-    }
-  })
 }
 </script>

@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
-    "@types/animejs": "^3.1.13",
     "animejs": "^4.4.1",
     "jsqr": "^1.4.0",
     "lucide-vue-next": "^0.525.0",

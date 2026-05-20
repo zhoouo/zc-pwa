@@ -221,15 +221,26 @@ const completeGiftClaims = async () => {
   if (!claimedGifts.length) return
 
   isGiftSequenceCompleting.value = true
-  const totalCoins = claimedGifts.reduce((sum, gift) => sum + gift.coins, 0)
-  const description = claimedGifts.map((gift) => `${getGiftLedgerTag(gift)} ${gift.title}`).join('、')
-  const result = await addSystemReward(totalCoins, description, 'self')
+  let totalCoins = 0
+  let hasError = false
 
-  if (result.error) {
-    pushNotify(`領取失敗：${result.error}`, 'error')
-    giftQueue.value = claimedGifts
-  } else {
-    claimedGifts.forEach(markGiftClaimedInStorage)
+  for (let i = 0; i < claimedGifts.length; i++) {
+    const gift = claimedGifts[i]
+    const description = `${getGiftLedgerTag(gift)} ${gift.title}`
+    const result = await addSystemReward(gift.coins, description, 'self')
+
+    if (result.error) {
+      pushNotify(`領取失敗：${result.error}`, 'error')
+      giftQueue.value = claimedGifts.slice(i)
+      hasError = true
+      break
+    } else {
+      markGiftClaimedInStorage(gift)
+      totalCoins += gift.coins
+    }
+  }
+
+  if (!hasError) {
     switchMainView('ledger')
     const giftCountText = claimedGifts.length > 1 ? `${claimedGifts.length} 份禮物` : '禮物'
     pushNotify(`恭喜！你領完${giftCountText}，獲得 ${totalCoins} 枚金幣`, 'success')

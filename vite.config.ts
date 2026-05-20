@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      'animejs': path.resolve(__dirname, 'node_modules/animejs/dist/modules/index.js')
+    }
+  },
   plugins: [
     vue(),
     VitePWA({

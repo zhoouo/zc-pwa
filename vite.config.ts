@@ -3,16 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
-import { createRequire } from 'module'
-
-const _require = createRequire(import.meta.url)
-
 export default defineConfig({
-  resolve: {
-    alias: {
-      'animejs': _require.resolve('animejs')
-    }
-  },
   plugins: [
     vue(),
     VitePWA({

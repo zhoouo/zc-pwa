@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { animate, stagger } from 'animejs'
+import { animate, stagger } from '../lib/anime.js'
 
 defineProps({
   targetDate: { type: String, required: true }, // Format: 'MM-DD' or 'YYYY-MM-DD'
